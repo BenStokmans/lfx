@@ -1,0 +1,18 @@
+version "0.1"
+module "effects/noise_stdlib"
+import "std/noise" as noise
+effect "Noise Stdlib"
+
+function sample(width, height, x, y, index, phase, params)
+  px = x / max(width, 1.0)
+  py = y / max(height, 1.0)
+  angle = phase * 6.28318
+
+  p = noise.perlin3(px * 3.0, py * 3.0, phase * 2.0)
+  v = noise.voronoi2(x, y)
+  b = noise.voronoi_border3(x, y, phase * 10.0)
+  w = noise.worley4(px * 2.0, py * 2.0, sin(angle), cos(angle))
+
+  combined = 0.5 + p * 0.2 + (v - 0.5) * 0.2 + b * 0.2 - w * 0.05
+  return clamp(combined, 0.0, 1.0)
+end

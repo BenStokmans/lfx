@@ -1,0 +1,7 @@
+module "effects/fill_layout_order"
+effect "fill_layout_order"
+
+function sample(width, height, x, y, index, phase, params)
+  total = max(width * height - 1.0, 1.0)
+  return clamp(index / total, 0.0, 1.0)
+end

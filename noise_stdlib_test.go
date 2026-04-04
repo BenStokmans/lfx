@@ -1,0 +1,82 @@
+package lfx_test
+
+import (
+	"math"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/BenStokmans/lfx/backend/cpu"
+	"github.com/BenStokmans/lfx/backend/wgsl"
+	"github.com/BenStokmans/lfx/compiler"
+	"github.com/BenStokmans/lfx/modules"
+	"github.com/BenStokmans/lfx/runtime"
+	"github.com/BenStokmans/lfx/stdlib"
+)
+
+func TestNoiseStdlibEffectSamplesAndEmitsWGSL(t *testing.T) {
+	root := "."
+	result, err := compiler.CompileFile(filepath.Join(root, "effects", "noise_stdlib.lfx"), compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err != nil {
+		t.Fatalf("compile file: %v", err)
+	}
+
+	params, err := runtime.Bind(result.IR.Params, nil)
+	if err != nil {
+		t.Fatalf("bind params: %v", err)
+	}
+
+	layout := runtime.Layout{
+		Width:  8,
+		Height: 8,
+		Points: []runtime.Point{
+			{Index: 0, X: 0, Y: 0},
+			{Index: 1, X: 2, Y: 1},
+			{Index: 2, X: 7, Y: 5},
+		},
+	}
+
+	evaluator := cpu.NewEvaluator(result.IR)
+	values := make([]float32, len(layout.Points))
+	for i := range layout.Points {
+		value, err := evaluator.SamplePoint(layout, i, 0.33, params)
+		if err != nil {
+			t.Fatalf("sample point %d: %v", i, err)
+		}
+		if math.IsNaN(float64(value)) {
+			t.Fatalf("sample point %d produced NaN", i)
+		}
+		if value < 0 || value > 1 {
+			t.Fatalf("sample point %d out of range: %f", i, value)
+		}
+		values[i] = value
+	}
+
+	if values[0] == values[1] && values[1] == values[2] {
+		t.Fatalf("noise effect should vary across points, got %v", values)
+	}
+
+	repeat, err := evaluator.SamplePoint(layout, 1, 0.33, params)
+	if err != nil {
+		t.Fatalf("repeat sample: %v", err)
+	}
+	if repeat != values[1] {
+		t.Fatalf("repeat sample mismatch: got %f want %f", repeat, values[1])
+	}
+
+	wgslSource, err := wgsl.Emit(result.IR)
+	if err != nil {
+		t.Fatalf("emit wgsl: %v", err)
+	}
+	for _, marker := range []string{"lfx_perlin3", "lfx_voronoi2", "lfx_voronoi_border3", "lfx_worley4"} {
+		if !strings.Contains(wgslSource, marker) {
+			t.Fatalf("wgsl output missing %s", marker)
+		}
+	}
+	if strings.Contains(wgslSource, "unknown") {
+		t.Fatalf("wgsl output contains unknown placeholder:\n%s", wgslSource)
+	}
+}

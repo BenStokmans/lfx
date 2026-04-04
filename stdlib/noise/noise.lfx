@@ -1,0 +1,38 @@
+module "std/noise"
+library "noise"
+
+export function perlin1(x)
+  return perlin(x)
+end
+
+export function perlin2(x, y)
+  return perlin(x, y)
+end
+
+export function perlin3(x, y, z)
+  return perlin(x, y, z)
+end
+
+export function voronoi2(x, y)
+  return voronoi(x, y)
+end
+
+export function voronoi3(x, y, z)
+  return voronoi(x, y, z)
+end
+
+export function voronoi_border3(x, y, z)
+  return voronoi_border(x, y, z)
+end
+
+export function worley2(x, y)
+  return worley(x, y)
+end
+
+export function worley3(x, y, z)
+  return worley(x, y, z)
+end
+
+export function worley4(x, y, z, w)
+  return worley(x, y, z, w)
+end

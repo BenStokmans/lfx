@@ -1,0 +1,79 @@
+version "0.1"
+module "effects/fill_iris"
+effect "fill_iris"
+
+params {
+  rampsize = int(4, 0, 100)
+  grid_aligned = bool(false)
+}
+
+
+function triangle_phase(t)
+  if t <= 0.5 then
+    return t * 2.0
+  else
+    return (1.0 - t) * 2.0
+  end
+end
+
+function sample(width, height, x, y, index, phase, params)
+  cx = (width - 1.0) / 2.0
+  cy = (height - 1.0) / 2.0
+  w_even = is_even(width)
+  h_even = is_even(height)
+  dx = abs(x - cx)
+  dy = abs(y - cy)
+  if params.grid_aligned then
+    if w_even > 0.0 then
+      dx = dx - 0.5
+    end
+  end
+  if params.grid_aligned then
+    if h_even > 0.0 then
+      dy = dy - 0.5
+    end
+  end
+  dist = sqrt(dx * dx + dy * dy)
+  mx = abs(0.0 - cx)
+  my = abs(0.0 - cy)
+  if params.grid_aligned then
+    if w_even > 0.0 then
+      mx = mx - 0.5
+    end
+  end
+  if params.grid_aligned then
+    if h_even > 0.0 then
+      my = my - 0.5
+    end
+  end
+  max_radius = sqrt(mx * mx + my * my)
+  span = ceil(max_radius) + 1.0 + params.rampsize
+  t = triangle_phase(phase) * span
+  pos = t - dist
+  if pos < 0.0 then
+    return 0.0
+  end
+  if pos < params.rampsize then
+    return pos / params.rampsize
+  end
+  if pos < span then
+    return 1.0
+  end
+  return 0.0
+end
+
+preset "outwards" {
+  speed = 1200
+  start = 0.0
+  loop_start = 0.0
+  loop_end = 0.5
+  finish = 0.5
+}
+
+preset "inwards" {
+  speed = 1200
+  start = 0.5
+  loop_start = 0.5
+  loop_end = 1.0
+  finish = 1.0
+}

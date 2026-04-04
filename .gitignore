@@ -1,0 +1,5 @@
+build/bin
+node_modules
+frontend/dist
+preview/frontend/dist
+preview/build/bin

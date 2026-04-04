@@ -1,0 +1,55 @@
+version "0.1"
+module "effects/perlin_501"
+import "std/noise" as noise
+effect "501_Perlin"
+
+params {
+  hsize = int(8, 1, 100)
+  vsize = int(8, 1, 100)
+  edge = int(50, 0, 100)
+  hmov = int(0, -5, 5)
+  vmov = int(0, -5, 5)
+  dur = int(16, 1, 24)
+  seed = int(1, 1, 10000)
+}
+
+function fadeframes(params)
+  return floor(min(params.hsize, params.vsize) * 2.0)
+end
+
+function loopframes(params)
+  return params.dur * 16.0 + 1.0
+end
+
+function totalframes(params)
+  return loopframes(params) + fadeframes(params) * 2.0
+end
+
+function loop_z(phase, params)
+  total_frame_count = totalframes(params)
+  loop_frame_count = loopframes(params)
+  current_frame = floor(phase * (total_frame_count - 1.0) + 1.0)
+  wrapped_frame = mod(current_frame - 1.0, loop_frame_count) + 1.0
+  return wrapped_frame / params.dur
+end
+
+function seeded_perlin(x, y, z, params)
+  seed_x = params.seed * 0.173
+  seed_y = params.seed * 0.379
+  seed_z = params.seed * 0.617
+  return noise.perlin3(x + seed_x, y + seed_y, z + seed_z)
+end
+
+function do_perlin(x, y, z, params)
+  xx = x / params.hsize + mod(z * params.hmov, 16.0)
+  yy = y / params.vsize + mod(z * params.vmov, 16.0)
+  edge_scale = max(params.edge / 100.0, 0.01)
+  v = seeded_perlin(xx, yy, z, params)
+  scaled = ((v / edge_scale) + 1.0) * 128.0
+  return 1.0 - (clamp(scaled, 0.0, 255.0) / 255.0)
+end
+
+function sample(width, height, x, y, index, phase, params)
+  z = loop_z(phase, params)
+  return do_perlin(x, y, z, params)
+end

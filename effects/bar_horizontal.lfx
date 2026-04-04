@@ -1,0 +1,42 @@
+module "effects/bar_horizontal"
+effect "bar_horizontal"
+
+params {
+  ramp = float(1.0, 0.0, 8.0)
+  high = float(1.0, 0.0, 8.0)
+  gap = float(1.0, 0.0, 8.0)
+  qty = float(3.0, 1.0, 16.0)
+}
+
+function sample(width, height, x, y, index, phase, params)
+  pos = x + phase * (params.ramp + params.high + params.gap)
+  period = params.ramp + params.high + params.ramp + params.gap
+  if period <= 0.0 then
+    return 0.0
+  end
+
+  local_pos = mod(pos, period * params.qty)
+  seg_pos = mod(local_pos, period)
+
+  if seg_pos < params.ramp then
+    if params.ramp == 0.0 then
+      return 1.0
+    end
+    return seg_pos / params.ramp
+  end
+
+  seg_pos = seg_pos - params.ramp
+  if seg_pos < params.high then
+    return 1.0
+  end
+
+  seg_pos = seg_pos - params.high
+  if seg_pos < params.ramp then
+    if params.ramp == 0.0 then
+      return 0.0
+    end
+    return 1.0 - seg_pos / params.ramp
+  end
+
+  return 0.0
+end
