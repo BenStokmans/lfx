@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/BenStokmans/lfx/backend/cpu"
+	"github.com/BenStokmans/lfx/backend/naga"
 	"github.com/BenStokmans/lfx/backend/wgsl"
 	"github.com/BenStokmans/lfx/compiler"
 	"github.com/BenStokmans/lfx/modules"
@@ -39,8 +40,10 @@ func run(args []string) error {
 		return runGraph(args[1:])
 	case "sample":
 		return runSample(args[1:])
+	case "emit":
+		return runEmit(args[1:])
 	case "emit-wgsl":
-		return runEmitWGSL(args[1:])
+		return runEmit(append([]string{"--target", "wgsl"}, args[1:]...))
 	default:
 		return usageError()
 	}
@@ -181,8 +184,10 @@ func runSample(args []string) error {
 	})
 }
 
-func runEmitWGSL(args []string) error {
-	fs := flag.NewFlagSet("emit-wgsl", flag.ContinueOnError)
+func runEmit(args []string) error {
+	fs := flag.NewFlagSet("emit", flag.ContinueOnError)
+	target := fs.String("target", "wgsl", "output target: wgsl, spirv, msl, glsl, hlsl")
+	output := fs.String("output", "", "output file (default: stdout)")
 	filePath, opts, err := commonArgs(fs, args)
 	if err != nil {
 		return err
@@ -193,12 +198,37 @@ func runEmitWGSL(args []string) error {
 		return err
 	}
 
-	source, err := wgsl.Emit(result.IR)
+	wgslSource, err := wgsl.Emit(result.IR)
 	if err != nil {
 		return err
 	}
-	fmt.Print(source)
-	return nil
+
+	if *target == "wgsl" {
+		return writeOutput(*output, []byte(wgslSource))
+	}
+
+	t, err := naga.ParseTarget(*target)
+	if err != nil {
+		return err
+	}
+
+	compiled, err := naga.Compile(wgslSource, t)
+	if err != nil {
+		return err
+	}
+
+	if compiled.Bytes != nil {
+		return writeOutput(*output, compiled.Bytes)
+	}
+	return writeOutput(*output, []byte(compiled.Code))
+}
+
+func writeOutput(path string, data []byte) error {
+	if path == "" {
+		_, err := os.Stdout.Write(data)
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
 func commonArgs(fs *flag.FlagSet, args []string) (string, compiler.Options, error) {
@@ -253,7 +283,7 @@ func loadLayout(path string) (runtime.Layout, error) {
 
 func usageError() error {
 	exe := filepath.Base(os.Args[0])
-	return fmt.Errorf("usage: %s <parse|check|graph|sample|emit-wgsl> [flags] <file.lfx>", exe)
+	return fmt.Errorf("usage: %s <parse|check|graph|sample|emit> [flags] <file.lfx>", exe)
 }
 
 func writeJSON(v any) error {
