@@ -59,11 +59,11 @@ func (a *analyzer) addError(pos parser.Pos, code, msg string) {
 // Analyze performs full semantic analysis on a parsed module.
 // It validates:
 //   - Effect modules must have exactly one "sample" function with 7 params
-//   - Library modules must not have sample or presets
+//   - Library modules must not have sample or a timeline block
 //   - Effect modules must not have export functions
 //   - Library modules: exported functions must exist
 //   - Parameter constructor validation (types, ranges)
-//   - Preset ordering: 0 <= start <= loop_start <= loop_end <= finish <= 1
+//   - Timeline marker ordering: 0 <= loop_start <= loop_end <= 1
 //   - All identifiers resolve (locals, params, imports, builtins)
 //   - No recursion (direct or mutual)
 //   - No forbidden constructs
@@ -79,8 +79,8 @@ func Analyze(mod *parser.Module, importedModules map[string]*parser.Module) []Er
 	// 3. Validate params block.
 	a.validateParams()
 
-	// 4. Validate presets.
-	a.validatePresets()
+	// 4. Validate optional timeline block.
+	a.validateTimeline()
 
 	// 5. Resolve each function body.
 	for _, fn := range a.mod.Funcs {
@@ -186,8 +186,8 @@ func (a *analyzer) checkLibraryConstraints() {
 		}
 	}
 
-	// Library modules must not have presets.
-	if len(a.mod.Presets) > 0 {
-		a.addError(a.mod.Presets[0].Pos, ErrLibraryHasPresets, "library modules must not have presets")
+	// Library modules must not have a timeline block.
+	if a.mod.Timeline != nil {
+		a.addError(a.mod.Timeline.Pos, ErrLibraryHasTimeline, "library modules must not have a timeline block")
 	}
 }

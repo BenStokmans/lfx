@@ -30,8 +30,8 @@ func TestParseFillIrisExample(t *testing.T) {
 	if mod.Params == nil || len(mod.Params.Params) != 2 {
 		t.Fatalf("expected 2 params, got %#v", mod.Params)
 	}
-	if len(mod.Presets) != 2 {
-		t.Fatalf("expected 2 presets, got %d", len(mod.Presets))
+	if mod.Timeline == nil {
+		t.Fatal("expected timeline block")
 	}
 
 	foundSample := false

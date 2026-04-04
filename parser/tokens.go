@@ -25,7 +25,7 @@ const (
 	TOKEN_EXPORT
 	TOKEN_EFFECT
 	TOKEN_PARAMS
-	TOKEN_PRESET
+	TOKEN_TIMELINE
 	TOKEN_FUNCTION
 	TOKEN_END
 	TOKEN_IF
@@ -83,7 +83,7 @@ var tokenNames = map[TokenType]string{
 	TOKEN_EXPORT:   "export",
 	TOKEN_EFFECT:   "effect",
 	TOKEN_PARAMS:   "params",
-	TOKEN_PRESET:   "preset",
+	TOKEN_TIMELINE: "timeline",
 	TOKEN_FUNCTION: "function",
 	TOKEN_END:      "end",
 	TOKEN_IF:       "if",
@@ -138,7 +138,7 @@ var keywords = map[string]TokenType{
 	"export":   TOKEN_EXPORT,
 	"effect":   TOKEN_EFFECT,
 	"params":   TOKEN_PARAMS,
-	"preset":   TOKEN_PRESET,
+	"timeline": TOKEN_TIMELINE,
 	"function": TOKEN_FUNCTION,
 	"end":      TOKEN_END,
 	"if":       TOKEN_IF,

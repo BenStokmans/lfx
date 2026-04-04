@@ -66,9 +66,9 @@ func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.M
 		}
 	}
 
-	// Convert presets.
-	for _, p := range mod.Presets {
-		l.irmod.Presets = append(l.irmod.Presets, convertPresetDecl(p))
+	// Convert optional timeline block.
+	if mod.Timeline != nil {
+		l.irmod.Timeline = convertTimelineDecl(mod.Timeline)
 	}
 
 	// Lower imported library functions (with mangled names).
@@ -606,25 +606,16 @@ func convertParamDef(p *parser.ParamDef) ir.ParamSpec {
 	return spec
 }
 
-// convertPresetDecl converts an AST PresetDecl to an IR PresetSpec.
-func convertPresetDecl(p *parser.PresetDecl) ir.PresetSpec {
-	spec := ir.PresetSpec{
-		Name: p.Name,
+// convertTimelineDecl converts an AST TimelineDecl to an IR TimelineSpec.
+func convertTimelineDecl(tl *parser.TimelineDecl) *ir.TimelineSpec {
+	spec := &ir.TimelineSpec{}
+	if tl.LoopStart != nil {
+		v := *tl.LoopStart
+		spec.LoopStart = &v
 	}
-	if v, ok := p.Fields["speed"]; ok {
-		spec.Speed = v
-	}
-	if v, ok := p.Fields["start"]; ok {
-		spec.Start = v
-	}
-	if v, ok := p.Fields["loop_start"]; ok {
-		spec.LoopStart = v
-	}
-	if v, ok := p.Fields["loop_end"]; ok {
-		spec.LoopEnd = v
-	}
-	if v, ok := p.Fields["finish"]; ok {
-		spec.Finish = v
+	if tl.LoopEnd != nil {
+		v := *tl.LoopEnd
+		spec.LoopEnd = &v
 	}
 	return spec
 }

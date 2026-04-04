@@ -2,39 +2,30 @@ package sema
 
 import "fmt"
 
-// validatePresets checks that each preset's timing fields are properly ordered:
-// 0 <= start <= loop_start <= loop_end <= finish <= 1
-func (a *analyzer) validatePresets() {
-	for _, p := range a.mod.Presets {
-		start, hasStart := p.Fields["start"]
-		loopStart, hasLoopStart := p.Fields["loop_start"]
-		loopEnd, hasLoopEnd := p.Fields["loop_end"]
-		finish, hasFinish := p.Fields["finish"]
+// validateTimeline checks that the optional timeline block's loop markers are
+// properly ordered and within range: 0 <= loop_start <= loop_end <= 1
+func (a *analyzer) validateTimeline() {
+	tl := a.mod.Timeline
+	if tl == nil {
+		return
+	}
 
-		if hasStart && (start < 0 || start > 1) {
-			a.addError(p.Pos, ErrPresetStartOutOfRange,
-				fmt.Sprintf("preset %q: start (%v) must be in [0, 1]", p.Name, start))
+	if tl.LoopStart != nil {
+		if *tl.LoopStart < 0 || *tl.LoopStart > 1 {
+			a.addError(tl.Pos, ErrTimelineLoopStartOutOfRange,
+				fmt.Sprintf("timeline: loop_start (%v) must be in [0, 1]", *tl.LoopStart))
 		}
-		if hasFinish && (finish < 0 || finish > 1) {
-			a.addError(p.Pos, ErrPresetFinishOutOfRange,
-				fmt.Sprintf("preset %q: finish (%v) must be in [0, 1]", p.Name, finish))
-		}
+	}
 
-		if hasStart && hasLoopStart && start > loopStart {
-			a.addError(p.Pos, ErrPresetStartAfterLoopStart,
-				fmt.Sprintf("preset %q: start (%v) must be <= loop_start (%v)", p.Name, start, loopStart))
+	if tl.LoopEnd != nil {
+		if *tl.LoopEnd < 0 || *tl.LoopEnd > 1 {
+			a.addError(tl.Pos, ErrTimelineLoopEndOutOfRange,
+				fmt.Sprintf("timeline: loop_end (%v) must be in [0, 1]", *tl.LoopEnd))
 		}
-		if hasLoopStart && hasLoopEnd && loopStart > loopEnd {
-			a.addError(p.Pos, ErrPresetLoopStartAfterLoopEnd,
-				fmt.Sprintf("preset %q: loop_start (%v) must be <= loop_end (%v)", p.Name, loopStart, loopEnd))
-		}
-		if hasLoopEnd && hasFinish && loopEnd > finish {
-			a.addError(p.Pos, ErrPresetLoopEndAfterFinish,
-				fmt.Sprintf("preset %q: loop_end (%v) must be <= finish (%v)", p.Name, loopEnd, finish))
-		}
-		if hasStart && hasFinish && start > finish {
-			a.addError(p.Pos, ErrPresetStartAfterFinish,
-				fmt.Sprintf("preset %q: start (%v) must be <= finish (%v)", p.Name, start, finish))
-		}
+	}
+
+	if tl.LoopStart != nil && tl.LoopEnd != nil && *tl.LoopStart > *tl.LoopEnd {
+		a.addError(tl.Pos, ErrTimelineLoopStartAfterLoopEnd,
+			fmt.Sprintf("timeline: loop_start (%v) must be <= loop_end (%v)", *tl.LoopStart, *tl.LoopEnd))
 	}
 }

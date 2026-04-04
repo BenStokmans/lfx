@@ -5,10 +5,7 @@ function sample(width, height, x, y, index, phase, params)
   return 1.0
 end
 
-preset "default" {
-  speed = 1200
-  start = 0.0
+timeline {
   loop_start = 0.0
   loop_end = 1.0
-  finish = 1.0
 }

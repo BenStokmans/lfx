@@ -27,8 +27,8 @@ func TestCompileForPreviewSuccess(t *testing.T) {
 	if len(artifact.Params) == 0 {
 		t.Fatal("expected params")
 	}
-	if len(artifact.Presets) == 0 {
-		t.Fatal("expected presets")
+	if artifact.Timeline == nil {
+		t.Fatal("expected timeline")
 	}
 	if !strings.Contains(artifact.WGSL, "fn lfx_sample(") {
 		t.Fatalf("wgsl missing sample entry:\n%s", artifact.WGSL)

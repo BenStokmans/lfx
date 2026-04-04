@@ -6,8 +6,8 @@ type Module struct {
 	SourcePath string
 	Params     []ParamSpec
 	Functions  []*Function
-	Sample     *Function // pointer to the sample function
-	Presets    []PresetSpec
+	Sample     *Function     // pointer to the sample function
+	Timeline   *TimelineSpec // optional loop markers; nil when no timeline block was declared
 }
 
 // ParamType classifies the kind of an effect parameter.
@@ -33,12 +33,10 @@ type ParamSpec struct {
 	Max          *float64
 }
 
-// PresetSpec describes a named preset configuration.
-type PresetSpec struct {
-	Name      string
-	Speed     float64
-	Start     float64
-	LoopStart float64
-	LoopEnd   float64
-	Finish    float64
+// TimelineSpec carries the optional loop markers declared in a timeline block.
+// All phase values are normalized to [0, 1]. Pointer fields are nil when
+// the corresponding marker was not specified by the effect author.
+type TimelineSpec struct {
+	LoopStart *float64 // sustain loop start; nil when not specified
+	LoopEnd   *float64 // sustain loop end; nil when not specified
 }

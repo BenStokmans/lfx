@@ -41,13 +41,9 @@ export interface ParamData {
   enumValues?: string[];
 }
 
-export interface PresetData {
-  name: string;
-  speed: number;
-  start: number;
-  loopStart: number;
-  loopEnd: number;
-  finish: number;
+export interface TimelineData {
+  loopStart?: number;
+  loopEnd?: number;
 }
 
 export interface DiagnosticData {
@@ -67,7 +63,7 @@ export interface CompileResponse {
   wgsl?: string;
   params: ParamData[];
   boundParams?: Record<string, unknown>;
-  presets: PresetData[];
+  timeline?: TimelineData;
   diagnostics: DiagnosticData[];
 }
 

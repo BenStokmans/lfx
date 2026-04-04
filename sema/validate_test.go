@@ -129,18 +129,16 @@ end
 		}
 	})
 
-	t.Run("rejects preset loop ordering violation", func(t *testing.T) {
+	t.Run("rejects timeline loop ordering violation", func(t *testing.T) {
 		mod, err := parser.Parse(`
-module "effects/bad_preset"
-effect "bad_preset"
+module "effects/bad_timeline"
+effect "bad_timeline"
 function sample(width, height, x, y, index, phase, params)
   return phase
 end
-preset "broken" {
-  start = 0.0
+timeline {
   loop_start = 0.8
   loop_end = 0.2
-  finish = 1.0
 }
 `)
 		if err != nil {
@@ -151,23 +149,21 @@ preset "broken" {
 		if len(errs) == 0 {
 			t.Fatal("expected semantic error")
 		}
-		if errs[0].Code != sema.ErrPresetLoopStartAfterLoopEnd {
-			t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrPresetLoopStartAfterLoopEnd)
+		if errs[0].Code != sema.ErrTimelineLoopStartAfterLoopEnd {
+			t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrTimelineLoopStartAfterLoopEnd)
 		}
 	})
 
-	t.Run("accepts preset ordering when valid", func(t *testing.T) {
+	t.Run("accepts timeline ordering when valid", func(t *testing.T) {
 		mod, err := parser.Parse(`
-module "effects/good_preset"
-effect "good_preset"
+module "effects/good_timeline"
+effect "good_timeline"
 function sample(width, height, x, y, index, phase, params)
   return phase
 end
-preset "ok" {
-  start = 0.0
+timeline {
   loop_start = 0.2
   loop_end = 0.8
-  finish = 1.0
 }
 `)
 		if err != nil {

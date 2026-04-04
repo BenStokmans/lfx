@@ -4,9 +4,9 @@ This document describes the LFX language as it is represented in this repository
 
 ## What LFX is for
 
-LFX is a small DSL for procedural lighting effects. An LFX program computes a scalar value for a single logical point in a lighting layout at a single normalized phase value. The host runtime is expected to:
+LFX is a small DSL for procedural lighting effects. An LFX program computes a scalar value for a single logical point in a lighting layout at a single normalized phase value `phase ∈ [0, 1]`. The host runtime is expected to:
 
-- choose presets and playback behavior
+- own playback policy, timing, speed, direction, looping, and release behavior
 - provide layout bounds and point coordinates
 - bind and validate parameter values
 - clamp or otherwise interpret the returned scalar
@@ -53,7 +53,7 @@ Effect modules are end-user effects. They may contain:
 - an optional `params { ... }` block
 - helper functions
 - one required `sample(...)` function
-- zero or more `preset "..." { ... }` blocks
+- an optional `timeline { ... }` block
 
 Example:
 
@@ -72,12 +72,9 @@ function sample(width, height, x, y, index, phase, params)
   return 1.0
 end
 
-preset "forward" {
-  speed = 1200
-  start = 0.0
+timeline {
   loop_start = 0.2
   loop_end = 0.8
-  finish = 1.0
 }
 ```
 
@@ -93,7 +90,7 @@ Library modules are reusable helper modules. They may contain:
 Library modules must not define:
 
 - `sample`
-- presets
+- a `timeline` block
 
 Example:
 
@@ -176,35 +173,41 @@ end
 
 At runtime, [`runtime.Bind`](../runtime/params.go) applies defaults, validates types, validates enum members, and clamps numeric overrides to declared bounds.
 
-## Presets
+## Timeline
 
-Effect modules may declare named presets:
+Effect modules may declare an optional `timeline` block that describes loop markers within the normalized phase clip:
 
 ```lfx
-preset "forward" {
-  speed = 1200
-  start = 0.0
-  loop_start = 0.2
-  loop_end = 0.8
-  finish = 1.0
+timeline {
+  loop_start = 0.25
+  loop_end = 0.75
 }
 ```
 
-Recognized fields in lowering/runtime:
+Recognized fields:
 
-- `speed`
-- `start`
-- `loop_start`
-- `loop_end`
-- `finish`
+- `loop_start` — start of the sustain loop region, in `[0, 1]`
+- `loop_end` — end of the sustain loop region, in `[0, 1]`
 
-Semantic and runtime validation enforce:
+Both fields are optional. If neither is specified the block may be omitted entirely.
+
+Semantic validation enforces:
 
 ```text
-0 <= start <= loop_start <= loop_end <= finish <= 1
+0 <= loop_start <= loop_end <= 1
 ```
 
-Library modules may not declare presets.
+The authored clip always spans `phase 0..1`. Timeline markers are descriptive metadata for the runtime — they do not themselves alter how the sample function is called. The runtime uses them to implement sustain-loop playback:
+
+- **start**: play from `phase 0` to `loop_start`
+- **hold**: loop in `[loop_start, loop_end)` while input is held
+- **release**: continue from `loop_end` to `phase 1`
+
+If no `timeline` block is present, the effect is treated as non-looping by default.
+
+Speed, direction, looping policy, and release behavior are entirely runtime-owned and are not part of the LFX language.
+
+Library modules must not declare a `timeline` block.
 
 ## Statements
 
@@ -313,7 +316,7 @@ The analyzer in [`sema`](../sema) currently enforces:
 - effect modules must define exactly one `sample` function
 - the `sample` function must have exactly 7 parameters
 - library modules must not define `sample`
-- library modules must not define presets
+- library modules must not define a `timeline` block
 - duplicate params, functions, and import aliases are rejected
 - every referenced identifier must resolve in lexical scope
 - recursion, including mutual recursion, is rejected
@@ -334,7 +337,8 @@ end
 
 The parser and semantic passes feed a shared IR in [`ir`](../ir). Lowering currently:
 
-- converts params and presets into typed IR specs
+- converts params into typed IR specs
+- converts an optional timeline block into an IR `TimelineSpec` (loop markers only)
 - lowers functions defined in the current module and imported exported functions
 - mangles imported function names
 - lowers `params.name` to `ParamRef`
@@ -377,12 +381,59 @@ function sample(width, height, x, y, index, phase, params)
   return clamp(value, 0.0, 1.0)
 end
 
-preset "default" {
-  speed = 1200
-  start = 0.0
+timeline {
   loop_start = 0.0
   loop_end = 1.0
-  finish = 1.0
+}
+```
+
+## fill_iris example
+
+```lfx
+version "0.1"
+module "effects/fill_iris"
+effect "Fill Iris"
+
+params {
+  rampsize = int(4, 0, 100)
+  grid_aligned = bool(false)
+}
+
+function triangle_phase(t)
+  if t <= 0.5 then
+    return t * 2.0
+  else
+    return (1.0 - t) * 2.0
+  end
+end
+
+function sample(width, height, x, y, index, phase, params)
+  cx = (width - 1.0) / 2.0
+  cy = (height - 1.0) / 2.0
+  dx = abs(x - cx)
+  dy = abs(y - cy)
+  dist = sqrt(dx * dx + dy * dy)
+  mx = abs(0.0 - cx)
+  my = abs(0.0 - cy)
+  max_radius = sqrt(mx * mx + my * my)
+  span = ceil(max_radius) + 1.0 + params.rampsize
+  t = triangle_phase(phase) * span
+  pos = t - dist
+  if pos < 0.0 then
+    return 0.0
+  end
+  if pos < params.rampsize then
+    return pos / params.rampsize
+  end
+  if pos < span then
+    return 1.0
+  end
+  return 0.0
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
 }
 ```
 
@@ -393,4 +444,58 @@ preset "default" {
 - [`sema`](../sema): semantic rules and identifier resolution
 - [`lower`](../lower): AST-to-IR lowering and name mangling
 - [`ir`](../ir): shared intermediate representation
-- [`runtime`](../runtime): layout, params, presets, and sampling contracts
+- [`runtime`](../runtime): layout, params, timeline, and sampling contracts
+
+## Migration from the preset model
+
+The previous LFX design carried playback hints inside named `preset` blocks:
+
+```lfx
+-- OLD (removed in v0.1)
+preset "forward" {
+  speed = 1200
+  start = 0.0
+  loop_start = 0.2
+  loop_end = 0.8
+  finish = 1.0
+}
+```
+
+That model is fully removed. The new model is:
+
+| Old concept | New location |
+|---|---|
+| `loop_start`, `loop_end` | `timeline { loop_start = ..., loop_end = ... }` in the effect file |
+| `start`, `finish` | removed — the clip is always normalized to `phase 0..1` |
+| `speed` | runtime configuration, not in the language |
+| preset name / multiple presets | runtime configuration, not in the language |
+| playback mode (oneshot, gated, loop) | runtime configuration, not in the language |
+
+### How to migrate an old effect
+
+1. Normalize the authored animation so it runs from `phase 0` to `phase 1`.
+2. If the old preset carried `loop_start` and `loop_end`, keep those values and place them in a `timeline` block.
+3. Remove `start`, `finish`, and `speed` from the effect entirely.
+4. Delete all `preset` blocks.
+5. Move playback behavior (speed, direction, loop mode, release policy) into runtime configuration.
+
+**Before:**
+
+```lfx
+preset "default" {
+  speed = 1200
+  start = 0.0
+  loop_start = 0.25
+  loop_end = 0.75
+  finish = 1.0
+}
+```
+
+**After:**
+
+```lfx
+timeline {
+  loop_start = 0.25
+  loop_end = 0.75
+}
+```

@@ -32,7 +32,7 @@ type PreviewArtifact struct {
 	WGSL         string               `json:"wgsl"`
 	Params       []ir.ParamSpec       `json:"params"`
 	BoundParams  map[string]any       `json:"boundParams"`
-	Presets      []ir.PresetSpec      `json:"presets"`
+	Timeline     *ir.TimelineSpec     `json:"timeline,omitempty"`
 	Diagnostics  []PreviewDiagnostic  `json:"diagnostics"`
 	Result       *Result              `json:"-"`
 	Sampler      runtime.Sampler      `json:"-"`
@@ -80,7 +80,7 @@ func CompileForPreview(filePath string, overrides map[string]any, opts Options) 
 		WGSL:         wgslSource,
 		Params:       append([]ir.ParamSpec(nil), result.IR.Params...),
 		BoundParams:  cloneMap(boundParams.Values),
-		Presets:      append([]ir.PresetSpec(nil), result.IR.Presets...),
+		Timeline:     result.IR.Timeline,
 		Diagnostics:  nil,
 		Result:       result,
 		Sampler:      cpu.NewEvaluator(result.IR),

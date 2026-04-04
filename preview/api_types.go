@@ -49,7 +49,7 @@ type CompileResponse struct {
 	WGSL          string           `json:"wgsl,omitempty"`
 	Params        []ParamData      `json:"params"`
 	BoundParams   map[string]any   `json:"boundParams,omitempty"`
-	Presets       []PresetData     `json:"presets"`
+	Timeline      *TimelineData    `json:"timeline,omitempty"`
 	Diagnostics   []DiagnosticData `json:"diagnostics"`
 }
 
@@ -62,13 +62,11 @@ type ParamData struct {
 	EnumValues   []string `json:"enumValues,omitempty"`
 }
 
-type PresetData struct {
-	Name      string  `json:"name"`
-	Speed     float64 `json:"speed"`
-	Start     float64 `json:"start"`
-	LoopStart float64 `json:"loopStart"`
-	LoopEnd   float64 `json:"loopEnd"`
-	Finish    float64 `json:"finish"`
+// TimelineData carries optional loop markers from the effect's timeline block.
+// Nil pointer fields mean the marker was not declared by the effect author.
+type TimelineData struct {
+	LoopStart *float64 `json:"loopStart,omitempty"`
+	LoopEnd   *float64 `json:"loopEnd,omitempty"`
 }
 
 type DiagnosticData struct {

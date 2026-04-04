@@ -202,7 +202,7 @@ func (a *App) CompilePreview(req CompileRequest) (*CompileResponse, error) {
 		WGSL:          artifact.WGSL,
 		Params:        mapParams(artifact.Params),
 		BoundParams:   artifact.BoundParams,
-		Presets:       mapPresets(artifact.Presets),
+		Timeline:      mapTimeline(artifact.Timeline),
 		Diagnostics:   nil,
 	}, nil
 }
@@ -285,19 +285,14 @@ func mapParams(params []ir.ParamSpec) []ParamData {
 	return out
 }
 
-func mapPresets(presets []ir.PresetSpec) []PresetData {
-	out := make([]PresetData, 0, len(presets))
-	for _, preset := range presets {
-		out = append(out, PresetData{
-			Name:      preset.Name,
-			Speed:     preset.Speed,
-			Start:     preset.Start,
-			LoopStart: preset.LoopStart,
-			LoopEnd:   preset.LoopEnd,
-			Finish:    preset.Finish,
-		})
+func mapTimeline(tl *ir.TimelineSpec) *TimelineData {
+	if tl == nil {
+		return nil
 	}
-	return out
+	return &TimelineData{
+		LoopStart: tl.LoopStart,
+		LoopEnd:   tl.LoopEnd,
+	}
 }
 
 func mapDiagnostics(items []compiler.PreviewDiagnostic) []DiagnosticData {

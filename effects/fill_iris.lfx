@@ -62,18 +62,7 @@ function sample(width, height, x, y, index, phase, params)
   return 0.0
 end
 
-preset "outwards" {
-  speed = 1200
-  start = 0.0
+timeline {
   loop_start = 0.0
-  loop_end = 0.5
-  finish = 0.5
-}
-
-preset "inwards" {
-  speed = 1200
-  start = 0.5
-  loop_start = 0.5
   loop_end = 1.0
-  finish = 1.0
 }

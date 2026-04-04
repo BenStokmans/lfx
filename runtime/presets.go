@@ -6,23 +6,24 @@ import (
 	"github.com/BenStokmans/lfx/ir"
 )
 
-// ValidatePreset checks the preset ordering constraint:
-// 0 <= start <= loop_start <= loop_end <= finish <= 1
-func ValidatePreset(p ir.PresetSpec) error {
-	if p.Start < 0 {
-		return fmt.Errorf("preset %q: start (%g) must be >= 0", p.Name, p.Start)
+// ValidateTimeline checks that a TimelineSpec's loop markers are within range
+// and properly ordered: 0 <= loop_start <= loop_end <= 1
+func ValidateTimeline(t *ir.TimelineSpec) error {
+	if t == nil {
+		return nil
 	}
-	if p.Start > p.LoopStart {
-		return fmt.Errorf("preset %q: start (%g) must be <= loop_start (%g)", p.Name, p.Start, p.LoopStart)
+	if t.LoopStart != nil {
+		if *t.LoopStart < 0 || *t.LoopStart > 1 {
+			return fmt.Errorf("timeline: loop_start (%g) must be in [0, 1]", *t.LoopStart)
+		}
 	}
-	if p.LoopStart > p.LoopEnd {
-		return fmt.Errorf("preset %q: loop_start (%g) must be <= loop_end (%g)", p.Name, p.LoopStart, p.LoopEnd)
+	if t.LoopEnd != nil {
+		if *t.LoopEnd < 0 || *t.LoopEnd > 1 {
+			return fmt.Errorf("timeline: loop_end (%g) must be in [0, 1]", *t.LoopEnd)
+		}
 	}
-	if p.LoopEnd > p.Finish {
-		return fmt.Errorf("preset %q: loop_end (%g) must be <= finish (%g)", p.Name, p.LoopEnd, p.Finish)
-	}
-	if p.Finish > 1 {
-		return fmt.Errorf("preset %q: finish (%g) must be <= 1", p.Name, p.Finish)
+	if t.LoopStart != nil && t.LoopEnd != nil && *t.LoopStart > *t.LoopEnd {
+		return fmt.Errorf("timeline: loop_start (%g) must be <= loop_end (%g)", *t.LoopStart, *t.LoopEnd)
 	}
 	return nil
 }

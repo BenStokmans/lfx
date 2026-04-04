@@ -171,7 +171,7 @@ func (p *Parser) ParseModule() (*Module, error) {
 		mod.Params = decl
 	}
 
-	// functions and presets (zero or more, intermixed)
+	// functions and optional timeline block (zero or more functions, at most one timeline)
 	for {
 		cur := p.current()
 		switch cur.Type {
@@ -187,12 +187,18 @@ func (p *Parser) ParseModule() (*Module, error) {
 				return nil, err
 			}
 			mod.Funcs = append(mod.Funcs, fn)
-		case TOKEN_PRESET:
-			pr, err := p.parsePresetDecl()
+		case TOKEN_TIMELINE:
+			if mod.Timeline != nil {
+				return nil, &ParseError{
+					Msg: "duplicate timeline block",
+					Pos: cur.Pos,
+				}
+			}
+			tl, err := p.parseTimelineDecl()
 			if err != nil {
 				return nil, err
 			}
-			mod.Presets = append(mod.Presets, pr)
+			mod.Timeline = tl
 		case TOKEN_EOF:
 			return mod, nil
 		default:
@@ -468,23 +474,19 @@ func (p *Parser) parseFuncDecl(exported bool) (*FuncDecl, error) {
 }
 
 // ---------------------------------------------------------------------------
-// Preset declaration
+// Timeline declaration
 // ---------------------------------------------------------------------------
 
-func (p *Parser) parsePresetDecl() (*PresetDecl, error) {
-	tok := p.advance() // consume 'preset'
-	nameTok, err := p.expect(TOKEN_STRING)
-	if err != nil {
-		return nil, err
-	}
+func (p *Parser) parseTimelineDecl() (*TimelineDecl, error) {
+	tok := p.advance() // consume 'timeline'
 	if _, err := p.expect(TOKEN_LBRACE); err != nil {
 		return nil, err
 	}
 
-	fields := make(map[string]float64)
+	decl := &TimelineDecl{Pos: tok.Pos}
 	for p.current().Type != TOKEN_RBRACE {
 		if p.current().Type == TOKEN_EOF {
-			return nil, &ParseError{Msg: "unterminated preset block", Pos: tok.Pos}
+			return nil, &ParseError{Msg: "unterminated timeline block", Pos: tok.Pos}
 		}
 		keyTok, err := p.expect(TOKEN_IDENT)
 		if err != nil {
@@ -497,11 +499,23 @@ func (p *Parser) parsePresetDecl() (*PresetDecl, error) {
 		if err != nil {
 			return nil, err
 		}
-		fields[keyTok.Literal] = val
+		switch keyTok.Literal {
+		case "loop_start":
+			v := val
+			decl.LoopStart = &v
+		case "loop_end":
+			v := val
+			decl.LoopEnd = &v
+		default:
+			return nil, &ParseError{
+				Msg: fmt.Sprintf("unknown timeline field %q (valid fields: loop_start, loop_end)", keyTok.Literal),
+				Pos: keyTok.Pos,
+			}
+		}
 	}
 	p.advance() // consume '}'
 
-	return &PresetDecl{Pos: tok.Pos, Name: nameTok.Literal, Fields: fields}, nil
+	return decl, nil
 }
 
 // ---------------------------------------------------------------------------

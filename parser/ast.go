@@ -21,8 +21,8 @@ type Module struct {
 	Library *LibraryDecl // nil for effect modules
 	Imports []*ImportDecl
 	Params  *ParamsDecl
-	Funcs   []*FuncDecl
-	Presets []*PresetDecl
+	Funcs    []*FuncDecl
+	Timeline *TimelineDecl
 }
 
 // ---------------------------------------------------------------------------
@@ -96,11 +96,12 @@ type FuncDecl struct {
 	Exported bool // true when preceded by the `export` keyword
 }
 
-// PresetDecl represents a `preset "name" { ... }` declaration.
-type PresetDecl struct {
-	Pos    Pos
-	Name   string
-	Fields map[string]float64
+// TimelineDecl represents an optional `timeline { ... }` block that declares
+// loop markers for the normalized phase clip.
+type TimelineDecl struct {
+	Pos       Pos
+	LoopStart *float64 // nil when not specified
+	LoopEnd   *float64 // nil when not specified
 }
 
 // ---------------------------------------------------------------------------

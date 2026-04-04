@@ -24,7 +24,7 @@ import type {
   DiagnosticData,
   LayoutData,
   ParamData,
-  PresetData,
+  TimelineData,
   WorkspaceData,
 } from "./types";
 
@@ -44,7 +44,6 @@ function App() {
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticData[]>([]);
   const [paramOverrides, setParamOverrides] = useState<Record<string, unknown>>({});
-  const [selectedPresetName, setSelectedPresetName] = useState("");
   const [phase, setPhase] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(false);
@@ -99,19 +98,18 @@ function App() {
 
     let frame = 0;
     let last = performance.now();
-    const preset = currentPreset(compileResult?.presets ?? [], selectedPresetName);
+    const timeline = compileResult?.timeline ?? null;
 
     const step = (now: number) => {
       const deltaSeconds = (now - last) / 1000;
       last = now;
-      const baseRate = ((preset?.speed ?? 1200) / 1200) * 0.15 * speed;
-      setPhase((value) => advancePhase(value, deltaSeconds * baseRate, preset));
+      setPhase((value) => advancePhase(value, deltaSeconds * 0.15 * speed, timeline));
       frame = requestAnimationFrame(step);
     };
 
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed, selectedPresetName, compileResult]);
+  }, [playing, speed, compileResult]);
 
   useEffect(() => {
     const layout = selectedLayout(layouts, selectedLayoutId);
@@ -251,9 +249,6 @@ function App() {
         setDiagnostics(response.diagnostics ?? []);
         if (response.compilationId) {
           setParamOverrides(response.boundParams ?? {});
-          if (!currentPreset(response.presets, selectedPresetName)) {
-            setSelectedPresetName(response.presets[0]?.name ?? "");
-          }
           setStatusMessage(`Compiled ${response.modulePath ?? response.filePath}`);
         } else {
           setStatusMessage("Compile failed");
@@ -298,7 +293,7 @@ function App() {
   }
 
   const layout = selectedLayout(layouts, selectedLayoutId);
-  const preset = currentPreset(compileResult?.presets ?? [], selectedPresetName);
+  const timeline = compileResult?.timeline ?? null;
 
   return (
     <div className="app-shell">
@@ -307,7 +302,7 @@ function App() {
           <p className="eyebrow">LFX Desktop Preview</p>
           <h1>Render scalar effects against real point layouts.</h1>
           <p className="lede">
-            Workspace-aware editing, WGSL preview, CPU parity sampling, and preset-window playback in one desktop tool.
+            Workspace-aware editing, WGSL preview, CPU parity sampling, and runtime-controlled playback in one desktop tool.
           </p>
         </div>
 
@@ -475,35 +470,18 @@ function App() {
                   type="button"
                   onClick={() => {
                     setPlaying(false);
-                    setPhase(preset?.start ?? 0);
+                    setPhase(0);
                   }}
                 >
                   Reset
                 </button>
-                <select
-                  value={selectedPresetName}
-                  onChange={(event) => {
-                    const nextPreset = currentPreset(compileResult?.presets ?? [], event.target.value);
-                    setSelectedPresetName(event.target.value);
-                    setPhase(nextPreset?.start ?? 0);
-                  }}
-                >
-                  <option value="">No preset window</option>
-                  {(compileResult?.presets ?? []).map((item) => (
-                    <option key={item.name} value={item.name}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
-            {preset ? (
+            {timeline ? (
               <div className="preset-strip">
-                <span>start {preset.start.toFixed(2)}</span>
-                <span>loop {preset.loopStart.toFixed(2)} → {preset.loopEnd.toFixed(2)}</span>
-                <span>finish {preset.finish.toFixed(2)}</span>
-                <span>speed {preset.speed.toFixed(0)}</span>
+                {timeline.loopStart != null ? <span>loop start {timeline.loopStart.toFixed(2)}</span> : null}
+                {timeline.loopEnd != null ? <span>loop end {timeline.loopEnd.toFixed(2)}</span> : null}
               </div>
             ) : null}
           </section>
@@ -583,10 +561,6 @@ function App() {
   );
 }
 
-function currentPreset(presets: PresetData[], name: string): PresetData | undefined {
-  return presets.find((item) => item.name === name);
-}
-
 function selectedLayout(layouts: LayoutData[], id: string): LayoutData | undefined {
   return layouts.find((item) => item.id === id);
 }
@@ -603,22 +577,16 @@ function shortName(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function advancePhase(current: number, delta: number, preset?: PresetData): number {
-  if (!preset) {
-    return (current + delta) % 1;
-  }
-
-  if (current < preset.start || current > preset.finish) {
-    return preset.start;
-  }
+function advancePhase(current: number, delta: number, timeline: TimelineData | null): number {
+  const loopStart = timeline?.loopStart ?? 0;
+  const loopEnd = timeline?.loopEnd ?? 1;
+  const loopSpan = Math.max(0.001, loopEnd - loopStart);
 
   const next = current + delta;
-  if (next <= preset.loopEnd) {
+  if (next <= loopEnd) {
     return next;
   }
-
-  const loopSpan = Math.max(0.001, preset.loopEnd - preset.loopStart);
-  return preset.loopStart + ((next - preset.loopStart) % loopSpan);
+  return loopStart + ((next - loopStart) % loopSpan);
 }
 
 export default App
