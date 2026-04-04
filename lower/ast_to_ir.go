@@ -4,28 +4,39 @@ import (
 	"fmt"
 	"github.com/BenStokmans/lfx/ir"
 	"github.com/BenStokmans/lfx/parser"
+	"github.com/BenStokmans/lfx/sema"
 )
 
 // builtinMap maps bare function names to their BuiltinID.
 var builtinMap = map[string]ir.BuiltinID{
-	"abs":            ir.BuiltinAbs,
-	"min":            ir.BuiltinMin,
-	"max":            ir.BuiltinMax,
-	"floor":          ir.BuiltinFloor,
-	"ceil":           ir.BuiltinCeil,
-	"sqrt":           ir.BuiltinSqrt,
-	"sin":            ir.BuiltinSin,
-	"cos":            ir.BuiltinCos,
-	"clamp":          ir.BuiltinClamp,
-	"mix":            ir.BuiltinMix,
-	"fract":          ir.BuiltinFract,
-	"mod":            ir.BuiltinMod,
-	"pow":            ir.BuiltinPow,
-	"is_even":        ir.BuiltinIsEven,
-	"perlin":         ir.BuiltinPerlin,
-	"voronoi":        ir.BuiltinVoronoi,
-	"voronoi_border": ir.BuiltinVoronoiBorder,
-	"worley":         ir.BuiltinWorley,
+	"abs":              ir.BuiltinAbs,
+	"min":              ir.BuiltinMin,
+	"max":              ir.BuiltinMax,
+	"floor":            ir.BuiltinFloor,
+	"ceil":             ir.BuiltinCeil,
+	"sqrt":             ir.BuiltinSqrt,
+	"sin":              ir.BuiltinSin,
+	"cos":              ir.BuiltinCos,
+	"clamp":            ir.BuiltinClamp,
+	"mix":              ir.BuiltinMix,
+	"fract":            ir.BuiltinFract,
+	"mod":              ir.BuiltinMod,
+	"pow":              ir.BuiltinPow,
+	"is_even":          ir.BuiltinIsEven,
+	"vec2":             ir.BuiltinVec2,
+	"vec3":             ir.BuiltinVec3,
+	"vec4":             ir.BuiltinVec4,
+	"dot":              ir.BuiltinDot,
+	"length":           ir.BuiltinLength,
+	"distance":         ir.BuiltinDistance,
+	"normalize":        ir.BuiltinNormalize,
+	"cross":            ir.BuiltinCross,
+	"project":          ir.BuiltinProject,
+	"reflect":          ir.BuiltinReflect,
+	"__perlin":         ir.BuiltinPerlin,
+	"__voronoi":        ir.BuiltinVoronoi,
+	"__voronoi_border": ir.BuiltinVoronoiBorder,
+	"__worley":         ir.BuiltinWorley,
 }
 
 // multiRetBuiltins lists builtins that return multiple values.
@@ -35,10 +46,15 @@ var multiRetBuiltins = map[ir.BuiltinID]int{}
 type Lowerer struct {
 	mod          *parser.Module
 	imports      map[string]*parser.Module // alias -> parsed library module
+	info         *sema.Info
+	importInfos  map[string]*sema.Info
 	irmod        *ir.Module
 	localCounter int
 	locals       map[string]int // name -> local index in current function
 	funcLocals   []ir.Local
+	currentMod   *parser.Module
+	currentInfo  *sema.Info
+	currentFn    *parser.FuncDecl
 
 	// paramNames tracks declared parameter names for ParamRef resolution.
 	paramNames map[string]ir.Type
@@ -46,10 +62,12 @@ type Lowerer struct {
 
 // Lower converts a parsed module and its resolved imports into an IR module.
 // importedModules maps import alias to the parsed library module.
-func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.Module, error) {
+func Lower(mod *parser.Module, importedModules map[string]*parser.Module, info *sema.Info, importedInfos map[string]*sema.Info) (*ir.Module, error) {
 	l := &Lowerer{
-		mod:     mod,
-		imports: importedModules,
+		mod:         mod,
+		imports:     importedModules,
+		info:        info,
+		importInfos: importedInfos,
 		irmod: &ir.Module{
 			Name:       mod.ModPath,
 			SourcePath: mod.ModPath,
@@ -82,7 +100,7 @@ func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.M
 				continue
 			}
 			mangledName := MangleName(alias, fn.Name)
-			irFn, err := l.lowerFunction(fn, mangledName, libMod.ModPath)
+			irFn, err := l.lowerFunction(libMod, importedInfos[alias], fn, mangledName, libMod.ModPath)
 			if err != nil {
 				return nil, fmt.Errorf("lowering imported function %s.%s: %w", alias, fn.Name, err)
 			}
@@ -92,7 +110,7 @@ func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.M
 
 	// Lower local functions.
 	for _, fn := range mod.Funcs {
-		irFn, err := l.lowerFunction(fn, fn.Name, mod.ModPath)
+		irFn, err := l.lowerFunction(mod, info, fn, fn.Name, mod.ModPath)
 		if err != nil {
 			return nil, fmt.Errorf("lowering function %s: %w", fn.Name, err)
 		}
@@ -111,26 +129,34 @@ func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.M
 }
 
 // lowerFunction converts an AST FuncDecl to an IR Function.
-func (l *Lowerer) lowerFunction(fn *parser.FuncDecl, name, source string) (*ir.Function, error) {
+func (l *Lowerer) lowerFunction(owner *parser.Module, ownerInfo *sema.Info, fn *parser.FuncDecl, name, source string) (*ir.Function, error) {
 	l.localCounter = 0
 	l.locals = make(map[string]int)
 	l.funcLocals = nil
+	l.currentMod = owner
+	l.currentInfo = ownerInfo
+	l.currentFn = fn
 
 	irFn := &ir.Function{
 		Name:     name,
 		Exported: fn.Exported,
 		Source:   source,
 	}
-	if fn.Name == "sample" {
-		irFn.MultiRet = l.irmod.Output.Channels()
+	sig := l.lookupFuncSig(fn)
+	if sig.MultiRet > 0 {
+		irFn.MultiRet = sig.MultiRet
 	}
 
 	// Create local slots for function parameters.
-	for _, paramName := range fn.Params {
-		idx := l.allocLocal(paramName, ir.TypeF32)
+	for idx, paramName := range fn.Params {
+		paramType := ir.TypeF32
+		if idx < len(sig.Params) && sig.Params[idx] != ir.TypeUnknown {
+			paramType = sig.Params[idx]
+		}
+		idx := l.allocLocal(paramName, paramType)
 		irFn.Params = append(irFn.Params, ir.FuncParam{
 			Name: paramName,
-			Type: ir.TypeF32,
+			Type: paramType,
 		})
 		_ = idx
 	}
@@ -154,7 +180,10 @@ func (l *Lowerer) lowerFunction(fn *parser.FuncDecl, name, source string) (*ir.F
 	}
 
 	irFn.Locals = l.funcLocals
-	irFn.ReturnType = ir.TypeF32 // default return type
+	irFn.ReturnType = sig.ReturnType
+	if irFn.ReturnType == ir.TypeUnknown {
+		irFn.ReturnType = ir.TypeF32
+	}
 
 	return irFn, nil
 }
@@ -209,9 +238,13 @@ func (l *Lowerer) lowerLocalStmt(s *parser.LocalStmt) (ir.IRStmt, error) {
 		indices := make([]int, len(names))
 		types := make([]ir.Type, len(names))
 		for i, name := range names {
-			idx := l.allocLocal(name, ir.TypeF32)
+			localType := l.lookupLocalType(name)
+			if localType == ir.TypeUnknown {
+				localType = ir.TypeF32
+			}
+			idx := l.allocLocal(name, localType)
 			indices[i] = idx
-			types[i] = ir.TypeF32
+			types[i] = localType
 		}
 		return &ir.MultiLocalDecl{
 			Names:   names,
@@ -231,11 +264,19 @@ func (l *Lowerer) lowerLocalStmt(s *parser.LocalStmt) (ir.IRStmt, error) {
 				return nil, err
 			}
 		}
-		idx := l.allocLocal(s.Names[0], ir.TypeF32)
+		localType := l.lookupLocalType(s.Names[0])
+		if localType == ir.TypeUnknown {
+			if init != nil {
+				localType = init.ResultType()
+			} else {
+				localType = ir.TypeF32
+			}
+		}
+		idx := l.allocLocal(s.Names[0], localType)
 		return &ir.LocalDecl{
 			Index: idx,
 			Name:  s.Names[0],
-			Typ:   ir.TypeF32,
+			Typ:   localType,
 			Init:  init,
 		}, nil
 	}
@@ -256,11 +297,15 @@ func (l *Lowerer) lowerAssignStmt(s *parser.AssignStmt) (ir.IRStmt, error) {
 	}
 	idx, ok := l.locals[s.Name]
 	if !ok {
-		idx = l.allocLocal(s.Name, val.ResultType())
+		localType := l.lookupLocalType(s.Name)
+		if localType == ir.TypeUnknown {
+			localType = val.ResultType()
+		}
+		idx = l.allocLocal(s.Name, localType)
 		return &ir.LocalDecl{
 			Index: idx,
 			Name:  s.Name,
-			Typ:   val.ResultType(),
+			Typ:   localType,
 			Init:  val,
 		}, nil
 	}
@@ -422,7 +467,10 @@ func (l *Lowerer) lowerBinaryExpr(e *parser.BinaryExpr) (ir.IRExpr, error) {
 		return nil, err
 	}
 
-	typ := inferBinaryType(op, left, right)
+	typ := l.lookupExprType(e)
+	if typ == ir.TypeUnknown {
+		typ = inferBinaryType(op, left, right)
+	}
 	return &ir.BinaryOp{
 		Op:    op,
 		Left:  left,
@@ -441,10 +489,14 @@ func (l *Lowerer) lowerUnaryExpr(e *parser.UnaryExpr) (ir.IRExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	typ := l.lookupExprType(e)
+	if typ == ir.TypeUnknown {
+		typ = operand.ResultType()
+	}
 	return &ir.UnaryOp{
 		Op:      op,
 		Operand: operand,
-		Typ:     operand.ResultType(),
+		Typ:     typ,
 	}, nil
 }
 
@@ -460,18 +512,27 @@ func (l *Lowerer) lowerCallExpr(e *parser.CallExpr) (ir.IRExpr, error) {
 		// Check if it's a builtin.
 		if bid, ok := builtinMap[fn.Name]; ok {
 			retCount := multiRetBuiltins[bid]
+			retType := l.lookupExprType(e)
+			if retType == ir.TypeUnknown {
+				retType = ir.TypeF32
+			}
 			return &ir.BuiltinCall{
 				Builtin:       bid,
 				Args:          args,
-				ReturnType:    ir.TypeF32,
+				ReturnType:    retType,
 				MultiRetCount: retCount,
 			}, nil
 		}
 		// Local function call.
+		retType := l.lookupExprType(e)
+		if retType == ir.TypeUnknown {
+			retType = ir.TypeF32
+		}
 		return &ir.Call{
-			Function:   fn.Name,
-			Args:       args,
-			ReturnType: ir.TypeF32,
+			Function:      fn.Name,
+			Args:          args,
+			ReturnType:    retType,
+			MultiRetCount: l.lookupCallMultiRet(fn.Name),
 		}, nil
 
 	case *parser.DotExpr:
@@ -482,10 +543,12 @@ func (l *Lowerer) lowerCallExpr(e *parser.CallExpr) (ir.IRExpr, error) {
 
 			// Unknown imported function: emit Call with mangled name.
 			mangledName := MangleName(alias, funcName)
+			retType := l.lookupImportedCallType(alias, funcName, e)
 			return &ir.Call{
-				Function:   mangledName,
-				Args:       args,
-				ReturnType: ir.TypeF32,
+				Function:      mangledName,
+				Args:          args,
+				ReturnType:    retType,
+				MultiRetCount: l.lookupImportedMultiRet(alias, funcName),
 			}, nil
 		}
 		return nil, fmt.Errorf("unsupported dot-call target %T", fn.Object)
@@ -505,6 +568,38 @@ func (l *Lowerer) lowerDotExpr(e *parser.DotExpr) (ir.IRExpr, error) {
 		return &ir.ParamRef{
 			Name: e.Field,
 			Typ:  typ,
+		}, nil
+	}
+	if ident, ok := e.Object.(*parser.Ident); ok {
+		if idx, exists := l.locals[ident.Name]; exists && l.funcLocals[idx].Type.IsVector() {
+			index, ok := componentIndex(e.Field)
+			if !ok {
+				return nil, fmt.Errorf("unknown vector field %q", e.Field)
+			}
+			return &ir.ComponentRef{
+				Vector: &ir.LocalRef{
+					Index: idx,
+					Name:  ident.Name,
+					Typ:   l.funcLocals[idx].Type,
+				},
+				Index: index,
+				Typ:   ir.TypeF32,
+			}, nil
+		}
+	}
+	base, err := l.lowerExpr(e.Object)
+	if err != nil {
+		return nil, err
+	}
+	if base.ResultType().IsVector() {
+		index, ok := componentIndex(e.Field)
+		if !ok {
+			return nil, fmt.Errorf("unknown vector field %q", e.Field)
+		}
+		return &ir.ComponentRef{
+			Vector: base,
+			Index:  index,
+			Typ:    ir.TypeF32,
 		}, nil
 	}
 	return nil, fmt.Errorf("unsupported dot expression: %T.%s", e.Object, e.Field)
@@ -575,6 +670,12 @@ func inferBinaryType(op ir.Op, left, right ir.IRExpr) ir.Type {
 	case ir.OpEq, ir.OpNeq, ir.OpLt, ir.OpGt, ir.OpLte, ir.OpGte, ir.OpAnd, ir.OpOr:
 		return ir.TypeBool
 	default:
+		if left.ResultType().IsVector() {
+			return left.ResultType()
+		}
+		if right.ResultType().IsVector() {
+			return right.ResultType()
+		}
 		// If either operand is f32, promote to f32.
 		if left.ResultType() == ir.TypeF32 || right.ResultType() == ir.TypeF32 {
 			return ir.TypeF32
@@ -658,5 +759,87 @@ func paramTypeToExprType(pt parser.ParamType) ir.Type {
 		return ir.TypeString
 	default:
 		return ir.TypeF32
+	}
+}
+
+func (l *Lowerer) lookupExprType(expr parser.Expr) ir.Type {
+	if l.currentInfo == nil {
+		return ir.TypeUnknown
+	}
+	if typ, ok := l.currentInfo.ExprTypes[expr]; ok {
+		return typ
+	}
+	return ir.TypeUnknown
+}
+
+func (l *Lowerer) lookupLocalType(name string) ir.Type {
+	if l.currentInfo == nil || l.currentFn == nil {
+		return ir.TypeUnknown
+	}
+	locals := l.currentInfo.Locals[l.currentFn]
+	if locals == nil {
+		return ir.TypeUnknown
+	}
+	return locals[name]
+}
+
+func (l *Lowerer) lookupFuncSig(fn *parser.FuncDecl) sema.FuncSignature {
+	if l.currentInfo == nil {
+		return sema.FuncSignature{ReturnType: ir.TypeF32}
+	}
+	if sig, ok := l.currentInfo.FuncTypes[fn]; ok {
+		return sig
+	}
+	return sema.FuncSignature{ReturnType: ir.TypeF32}
+}
+
+func (l *Lowerer) lookupCallMultiRet(name string) int {
+	if l.currentInfo == nil {
+		return 0
+	}
+	for fn, sig := range l.currentInfo.FuncTypes {
+		if fn.Name == name {
+			return sig.MultiRet
+		}
+	}
+	return 0
+}
+
+func (l *Lowerer) lookupImportedCallType(alias, funcName string, expr parser.Expr) ir.Type {
+	typ := l.lookupExprType(expr)
+	if typ != ir.TypeUnknown {
+		return typ
+	}
+	if info := l.importInfos[alias]; info != nil {
+		if sig, ok := info.Exports[funcName]; ok {
+			if sig.ReturnType != ir.TypeUnknown {
+				return sig.ReturnType
+			}
+		}
+	}
+	return ir.TypeF32
+}
+
+func (l *Lowerer) lookupImportedMultiRet(alias, funcName string) int {
+	if info := l.importInfos[alias]; info != nil {
+		if sig, ok := info.Exports[funcName]; ok {
+			return sig.MultiRet
+		}
+	}
+	return 0
+}
+
+func componentIndex(field string) (int, bool) {
+	switch field {
+	case "x", "r":
+		return 0, true
+	case "y", "g":
+		return 1, true
+	case "z", "b":
+		return 2, true
+	case "w":
+		return 3, true
+	default:
+		return 0, false
 	}
 }

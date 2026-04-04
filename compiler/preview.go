@@ -83,7 +83,7 @@ func CompileForPreview(filePath string, overrides map[string]any, opts Options) 
 		Params:       append([]ir.ParamSpec(nil), result.IR.Params...),
 		BoundParams:  cloneMap(boundParams.Values),
 		Timeline:     result.IR.Timeline,
-		Diagnostics:  nil,
+		Diagnostics:  DiagnosticsFromWarnings(filePath, result.Entry.ModPath, result.Warnings),
 		Result:       result,
 		Sampler:      cpu.NewEvaluator(result.IR),
 		BoundRuntime: boundParams,
@@ -159,6 +159,25 @@ func DiagnosticsFromError(filePath, modulePath string, err error) []PreviewDiagn
 		FilePath:   filePath,
 		ModulePath: modulePath,
 	}}
+}
+
+func DiagnosticsFromWarnings(filePath, modulePath string, warnings []sema.Warning) []PreviewDiagnostic {
+	if len(warnings) == 0 {
+		return nil
+	}
+	diags := make([]PreviewDiagnostic, 0, len(warnings))
+	for _, warning := range warnings {
+		diags = append(diags, PreviewDiagnostic{
+			Severity:   "warning",
+			Code:       warning.Code,
+			Message:    warning.Msg,
+			FilePath:   filePath,
+			ModulePath: modulePath,
+			Line:       warning.Pos.Line,
+			Column:     warning.Pos.Col,
+		})
+	}
+	return diags
 }
 
 func cloneMap(values map[string]any) map[string]any {

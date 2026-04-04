@@ -36,53 +36,61 @@ func (e *Evaluator) SamplePoint(layout runtime.Layout, pointIndex int, phase flo
 	}
 
 	pt := layout.Points[pointIndex]
-
-	args := []float64{
-		float64(layout.Width),
-		float64(layout.Height),
-		float64(pt.X),
-		float64(pt.Y),
-		float64(pt.Index),
-		float64(phase),
-		0,
+	args := []value{
+		scalarValue(ir.TypeF32, float64(layout.Width)),
+		scalarValue(ir.TypeF32, float64(layout.Height)),
+		scalarValue(ir.TypeF32, float64(pt.X)),
+		scalarValue(ir.TypeF32, float64(pt.Y)),
+		scalarValue(ir.TypeF32, float64(pt.Index)),
+		scalarValue(ir.TypeF32, float64(phase)),
+		scalarValue(ir.TypeF32, 0),
 	}
 
 	results, err := e.execFunc(e.module.Sample, args, params)
 	if err != nil {
 		return nil, err
 	}
-	channels := e.module.Output.Channels()
-	if len(results) < channels {
-		return nil, fmt.Errorf("sample function returned %d values, expected %d", len(results), channels)
-	}
 
+	channels := e.module.Output.Channels()
 	out := make([]float32, channels)
-	for i := 0; i < channels; i++ {
-		v := math.Max(0, math.Min(1, results[i]))
-		out[i] = float32(v)
+	switch {
+	case len(results) == 1 && results[0].Typ.IsVector():
+		if results[0].laneCount() < channels {
+			return nil, fmt.Errorf("sample vector returned %d values, expected %d", results[0].laneCount(), channels)
+		}
+		for idx := 0; idx < channels; idx++ {
+			out[idx] = float32(clampOutput(results[0].Lanes[idx]))
+		}
+	case len(results) >= channels:
+		for idx := 0; idx < channels; idx++ {
+			out[idx] = float32(clampOutput(results[idx].scalar()))
+		}
+	default:
+		return nil, fmt.Errorf("sample function returned %d values, expected %d", len(results), channels)
 	}
 	return out, nil
 }
 
 // frame holds the local variables and bound params for a single function invocation.
 type frame struct {
-	locals []float64
+	locals []value
 	params *runtime.BoundParams
 }
 
-func (e *Evaluator) execFunc(fn *ir.Function, args []float64, params *runtime.BoundParams) ([]float64, error) {
+func (e *Evaluator) execFunc(fn *ir.Function, args []value, params *runtime.BoundParams) ([]value, error) {
 	if fn == nil {
 		return nil, fmt.Errorf("function is nil")
 	}
 	f := &frame{
-		locals: make([]float64, len(fn.Locals)),
+		locals: make([]value, len(fn.Locals)),
 		params: params,
 	}
-
-	// Bind function parameters to local slots.
-	for i, arg := range args {
-		if i < len(fn.Params) {
-			f.locals[i] = arg
+	for idx := range fn.Locals {
+		f.locals[idx] = zeroValue(fn.Locals[idx].Type)
+	}
+	for idx, arg := range args {
+		if idx < len(fn.Params) {
+			f.locals[idx] = arg
 		}
 	}
 
@@ -96,10 +104,10 @@ func (e *Evaluator) execFunc(fn *ir.Function, args []float64, params *runtime.Bo
 		}
 	}
 
-	return []float64{0}, nil
+	return []value{scalarValue(ir.TypeF32, 0)}, nil
 }
 
-func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, didReturn bool, err error) {
+func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []value, didReturn bool, err error) {
 	switch s := stmt.(type) {
 	case *ir.LocalDecl:
 		if s.Init != nil {
@@ -133,7 +141,7 @@ func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, did
 		if err != nil {
 			return nil, false, err
 		}
-		if cond != 0 {
+		if cond.truthy() {
 			for _, inner := range s.Then {
 				retVal, didReturn, err := e.execStmt(inner, f)
 				if err != nil || didReturn {
@@ -147,7 +155,7 @@ func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, did
 				if err != nil {
 					return nil, false, err
 				}
-				if c != 0 {
+				if c.truthy() {
 					for _, inner := range elif.Body {
 						retVal, didReturn, err := e.execStmt(inner, f)
 						if err != nil || didReturn {
@@ -172,7 +180,7 @@ func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, did
 		if len(s.Values) == 0 {
 			return nil, true, nil
 		}
-		vals := make([]float64, 0, len(s.Values))
+		vals := make([]value, 0, len(s.Values))
 		for _, expr := range s.Values {
 			value, err := e.evalExpr(expr, f)
 			if err != nil {
@@ -195,31 +203,31 @@ func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, did
 	return nil, false, nil
 }
 
-func (e *Evaluator) evalExpr(expr ir.IRExpr, f *frame) (float64, error) {
+func (e *Evaluator) evalExpr(expr ir.IRExpr, f *frame) (value, error) {
 	vals, err := e.evalExprMulti(expr, f)
 	if err != nil {
-		return 0, err
+		return zeroValue(ir.TypeF32), err
 	}
 	if len(vals) == 0 {
-		return 0, nil
+		return zeroValue(ir.TypeF32), nil
 	}
 	return vals[0], nil
 }
 
-func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]float64, error) {
+func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]value, error) {
 	switch ex := expr.(type) {
 	case *ir.Const:
-		return []float64{constToFloat64(ex)}, nil
+		return []value{constToValue(ex)}, nil
 
 	case *ir.LocalRef:
-		return []float64{f.locals[ex.Index]}, nil
+		return []value{f.locals[ex.Index]}, nil
 
 	case *ir.ParamRef:
 		v, ok := f.params.Values[ex.Name]
 		if !ok {
 			return nil, fmt.Errorf("unknown param %q", ex.Name)
 		}
-		return []float64{anyToFloat64(v)}, nil
+		return []value{paramToValue(ex.Typ, v)}, nil
 
 	case *ir.BinaryOp:
 		left, err := e.evalExpr(ex.Left, f)
@@ -230,7 +238,7 @@ func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]float64, error) {
 		if err != nil {
 			return nil, err
 		}
-		return []float64{evalBinaryOp(ex.Op, left, right)}, nil
+		return []value{evalBinaryValue(ex.Op, ex.Typ, left, right)}, nil
 
 	case *ir.UnaryOp:
 		operand, err := e.evalExpr(ex.Operand, f)
@@ -239,12 +247,9 @@ func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]float64, error) {
 		}
 		switch ex.Op {
 		case ir.OpNeg:
-			return []float64{-operand}, nil
+			return []value{mapUnary(operand, func(x float64) float64 { return -x })}, nil
 		case ir.OpNot:
-			if operand == 0 {
-				return []float64{1}, nil
-			}
-			return []float64{0}, nil
+			return []value{boolValue(!operand.truthy())}, nil
 		default:
 			return nil, fmt.Errorf("unknown unary op %v", ex.Op)
 		}
@@ -254,26 +259,30 @@ func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]float64, error) {
 		if !ok {
 			return nil, fmt.Errorf("unknown function %q", ex.Function)
 		}
-		args := make([]float64, len(ex.Args))
-		for i, a := range ex.Args {
-			v, err := e.evalExpr(a, f)
+		args := make([]value, len(ex.Args))
+		for idx, arg := range ex.Args {
+			v, err := e.evalExpr(arg, f)
 			if err != nil {
 				return nil, err
 			}
-			args[i] = v
+			args[idx] = v
 		}
 		return e.execFunc(fn, args, f.params)
 
 	case *ir.BuiltinCall:
-		args := make([]float64, len(ex.Args))
-		for i, a := range ex.Args {
-			v, err := e.evalExpr(a, f)
+		args := make([]value, len(ex.Args))
+		for idx, arg := range ex.Args {
+			v, err := e.evalExpr(arg, f)
 			if err != nil {
 				return nil, err
 			}
-			args[i] = v
+			args[idx] = v
 		}
-		return e.callBuiltin(ex.Builtin, args)
+		v, err := e.callBuiltin(ex.Builtin, args)
+		if err != nil {
+			return nil, err
+		}
+		return []value{v}, nil
 
 	case *ir.TupleRef:
 		vals, err := e.evalExprMulti(ex.Tuple, f)
@@ -283,33 +292,54 @@ func (e *Evaluator) evalExprMulti(expr ir.IRExpr, f *frame) ([]float64, error) {
 		if ex.Index >= len(vals) {
 			return nil, fmt.Errorf("tuple index %d out of range (len %d)", ex.Index, len(vals))
 		}
-		return []float64{vals[ex.Index]}, nil
+		return []value{vals[ex.Index]}, nil
+
+	case *ir.ComponentRef:
+		base, err := e.evalExpr(ex.Vector, f)
+		if err != nil {
+			return nil, err
+		}
+		if ex.Index >= base.laneCount() {
+			return nil, fmt.Errorf("component index %d out of range for %s", ex.Index, base.Typ)
+		}
+		return []value{base.component(ex.Index)}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown expression type %T", expr)
 	}
 }
 
-func constToFloat64(c *ir.Const) float64 {
+func constToValue(c *ir.Const) value {
 	switch v := c.Value.(type) {
 	case float64:
-		return v
+		return scalarValue(c.Typ, v)
 	case float32:
-		return float64(v)
+		return scalarValue(c.Typ, float64(v))
 	case int:
-		return float64(v)
+		return scalarValue(c.Typ, float64(v))
 	case int64:
-		return float64(v)
+		return scalarValue(c.Typ, float64(v))
 	case int32:
-		return float64(v)
+		return scalarValue(c.Typ, float64(v))
 	case bool:
-		if v {
-			return 1
-		}
-		return 0
+		return boolValue(v)
 	default:
-		return 0
+		return zeroValue(c.Typ)
 	}
+}
+
+func paramToValue(typ ir.Type, raw any) value {
+	switch typ {
+	case ir.TypeBool:
+		if b, ok := raw.(bool); ok {
+			return boolValue(b)
+		}
+	case ir.TypeI32:
+		return scalarValue(typ, anyToFloat64(raw))
+	case ir.TypeF32:
+		return scalarValue(typ, anyToFloat64(raw))
+	}
+	return scalarValue(typ, anyToFloat64(raw))
 }
 
 func anyToFloat64(v any) float64 {
@@ -334,48 +364,70 @@ func anyToFloat64(v any) float64 {
 	}
 }
 
-func evalBinaryOp(op ir.Op, left, right float64) float64 {
+func evalBinaryValue(op ir.Op, resultType ir.Type, left, right value) value {
+	switch op {
+	case ir.OpEq:
+		return boolValue(equalValues(left, right))
+	case ir.OpNeq:
+		return boolValue(!equalValues(left, right))
+	case ir.OpLt:
+		return boolValue(left.scalar() < right.scalar())
+	case ir.OpGt:
+		return boolValue(left.scalar() > right.scalar())
+	case ir.OpLte:
+		return boolValue(left.scalar() <= right.scalar())
+	case ir.OpGte:
+		return boolValue(left.scalar() >= right.scalar())
+	case ir.OpAnd:
+		return boolValue(left.truthy() && right.truthy())
+	case ir.OpOr:
+		return boolValue(left.truthy() || right.truthy())
+	}
+
+	left, right, target := liftBinary(left, right)
+	if resultType != ir.TypeUnknown {
+		target = resultType
+	}
 	switch op {
 	case ir.OpAdd:
-		return left + right
+		return mapBinary(left, right, target, func(l, r float64) float64 { return l + r })
 	case ir.OpSub:
-		return left - right
+		return mapBinary(left, right, target, func(l, r float64) float64 { return l - r })
 	case ir.OpMul:
-		return left * right
+		return mapBinary(left, right, target, func(l, r float64) float64 { return l * r })
 	case ir.OpDiv:
-		if right == 0 {
-			return 0
-		}
-		return left / right
+		return mapBinary(left, right, target, func(l, r float64) float64 {
+			if r == 0 {
+				return 0
+			}
+			return l / r
+		})
 	case ir.OpMod:
-		if right == 0 {
-			return 0
-		}
-		return left - right*math.Floor(left/right)
-	case ir.OpEq:
-		return boolToFloat(left == right)
-	case ir.OpNeq:
-		return boolToFloat(left != right)
-	case ir.OpLt:
-		return boolToFloat(left < right)
-	case ir.OpGt:
-		return boolToFloat(left > right)
-	case ir.OpLte:
-		return boolToFloat(left <= right)
-	case ir.OpGte:
-		return boolToFloat(left >= right)
-	case ir.OpAnd:
-		return boolToFloat(left != 0 && right != 0)
-	case ir.OpOr:
-		return boolToFloat(left != 0 || right != 0)
+		return mapBinary(left, right, target, func(l, r float64) float64 {
+			if r == 0 {
+				return 0
+			}
+			return l - r*math.Floor(l/r)
+		})
 	default:
-		return 0
+		return zeroValue(target)
 	}
 }
 
-func boolToFloat(b bool) float64 {
-	if b {
-		return 1
+func equalValues(left, right value) bool {
+	left, right, _ = liftBinary(left, right)
+	switch left.Typ {
+	case ir.TypeVec2:
+		return left.Lanes[0] == right.Lanes[0] && left.Lanes[1] == right.Lanes[1]
+	case ir.TypeVec3:
+		return left.Lanes[0] == right.Lanes[0] && left.Lanes[1] == right.Lanes[1] && left.Lanes[2] == right.Lanes[2]
+	case ir.TypeVec4:
+		return left.Lanes[0] == right.Lanes[0] && left.Lanes[1] == right.Lanes[1] && left.Lanes[2] == right.Lanes[2] && left.Lanes[3] == right.Lanes[3]
+	default:
+		return left.Lanes[0] == right.Lanes[0]
 	}
-	return 0
+}
+
+func clampOutput(v float64) float64 {
+	return math.Max(0, math.Min(1, v))
 }

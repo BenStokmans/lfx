@@ -18,11 +18,19 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("%s: [%s] %s", e.Pos.String(), e.Code, e.Msg)
 }
 
+// Warning is a non-fatal semantic diagnostic.
+type Warning struct {
+	Msg  string
+	Pos  parser.Pos
+	Code string // stable warning code, e.g. "W001"
+}
+
 // analyzer holds the state for a single analysis pass.
 type analyzer struct {
 	mod       *parser.Module
 	imports   map[string]*parser.Module
 	errors    []Error
+	warnings  []Warning
 	scope     *Scope
 	callGraph map[string]map[string]bool // caller -> set of callees
 	builtins  map[string]bool
@@ -30,9 +38,11 @@ type analyzer struct {
 
 // builtinNames is the set of built-in functions available in LFX.
 var builtinNames = []string{
+	"vec2", "vec3", "vec4",
 	"abs", "min", "max", "floor", "ceil", "sqrt",
 	"sin", "cos", "clamp", "mix", "fract", "mod", "pow", "is_even",
-	"perlin", "voronoi", "voronoi_border", "worley",
+	"dot", "length", "distance", "normalize", "cross", "project", "reflect",
+	"__perlin", "__voronoi", "__voronoi_border", "__worley",
 }
 
 func newAnalyzer(mod *parser.Module, importedModules map[string]*parser.Module) *analyzer {
@@ -56,6 +66,10 @@ func (a *analyzer) addError(pos parser.Pos, code, msg string) {
 	a.errors = append(a.errors, Error{Pos: pos, Code: code, Msg: msg})
 }
 
+func (a *analyzer) addWarning(pos parser.Pos, code, msg string) {
+	a.warnings = append(a.warnings, Warning{Pos: pos, Code: code, Msg: msg})
+}
+
 // Analyze performs full semantic analysis on a parsed module.
 // It validates:
 //   - Effect modules must have exactly one "sample" function with 7 params
@@ -68,32 +82,8 @@ func (a *analyzer) addError(pos parser.Pos, code, msg string) {
 //   - No recursion (direct or mutual)
 //   - No forbidden constructs
 func Analyze(mod *parser.Module, importedModules map[string]*parser.Module) []Error {
-	a := newAnalyzer(mod, importedModules)
-
-	// 1. Build module-level scope.
-	a.buildModuleScope()
-
-	// 2. Check module kind constraints.
-	a.checkModuleConstraints()
-
-	// 3. Validate params block.
-	a.validateParams()
-
-	// 4. Validate optional timeline block.
-	a.validateTimeline()
-
-	// 5. Resolve each function body.
-	for _, fn := range a.mod.Funcs {
-		a.resolveFunc(fn)
-	}
-
-	// 6. Validate sample return arity against output declaration.
-	a.validateReturnArity()
-
-	// 7. Check for recursion.
-	a.checkRecursion()
-
-	return a.errors
+	_, errs, _ := AnalyzeModule(mod, importedModules, nil)
+	return errs
 }
 
 // buildModuleScope populates the top-level scope with builtins, params,
@@ -203,42 +193,4 @@ func (a *analyzer) checkLibraryConstraints() {
 	if a.mod.Output != nil {
 		a.addError(a.mod.Output.Pos, ErrOutputInLibrary, "library modules must not declare an output type")
 	}
-}
-
-func (a *analyzer) validateReturnArity() {
-	var sampleFn *parser.FuncDecl
-	for _, fn := range a.mod.Funcs {
-		if fn.Name == "sample" {
-			sampleFn = fn
-			break
-		}
-	}
-	if sampleFn == nil {
-		return
-	}
-
-	expected := parser.OutputScalar.Channels()
-	if a.mod.Output != nil {
-		expected = a.mod.Output.Type.Channels()
-	}
-
-	var walk func([]parser.Stmt)
-	walk = func(stmts []parser.Stmt) {
-		for _, stmt := range stmts {
-			switch s := stmt.(type) {
-			case *parser.ReturnStmt:
-				if len(s.Values) != 0 && len(s.Values) != expected {
-					a.addError(s.Pos, ErrReturnArityMismatch, fmt.Sprintf("sample return arity mismatch: output expects %d values, got %d", expected, len(s.Values)))
-				}
-			case *parser.IfStmt:
-				walk(s.Body)
-				for _, elseif := range s.ElseIfs {
-					walk(elseif.Body)
-				}
-				walk(s.ElseBody)
-			}
-		}
-	}
-
-	walk(sampleFn.Body)
 }

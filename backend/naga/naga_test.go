@@ -24,10 +24,14 @@ func emitWGSL(t *testing.T, source string) string {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if errs := sema.Analyze(mod, nil); len(errs) != 0 {
+	info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
 		t.Fatalf("sema: %v", errs)
 	}
-	irmod, err := lower.Lower(mod, nil)
+	if len(warns) != 0 {
+		t.Fatalf("unexpected semantic warnings: %v", warns)
+	}
+	irmod, err := lower.Lower(mod, nil, info, nil)
 	if err != nil {
 		t.Fatalf("lower: %v", err)
 	}

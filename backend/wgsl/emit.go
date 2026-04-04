@@ -218,6 +218,8 @@ func (e *Emitter) markReachableExpr(expr ir.IRExpr, byName map[string]*ir.Functi
 		}
 	case *ir.TupleRef:
 		e.markReachableExpr(ex.Tuple, byName, visit)
+	case *ir.ComponentRef:
+		e.markReachableExpr(ex.Vector, byName, visit)
 	}
 }
 
@@ -232,7 +234,7 @@ func (e *Emitter) emitSampleFunction(fn *ir.Function) error {
 	// The first len(fn.Params) locals are the function parameters.
 	for i := len(fn.Params); i < len(fn.Locals); i++ {
 		local := fn.Locals[i]
-		e.writef("var %s: f32 = 0.0;\n", sanitizeName(local.Name))
+		e.writef("var %s: %s = %s;\n", sanitizeName(local.Name), wgslType(local.Type), zeroLiteral(local.Type))
 	}
 
 	for _, stmt := range fn.Body {
@@ -251,12 +253,14 @@ func (e *Emitter) emitFunction(fn *ir.Function) error {
 	retType := "f32"
 	if fn.MultiRet > 1 {
 		retType = multiRetStructName(fn.Name, fn.MultiRet)
+	} else {
+		retType = wgslType(fn.ReturnType)
 	}
 
 	// Build parameter list.
 	var params []string
 	for _, p := range fn.Params {
-		params = append(params, fmt.Sprintf("%s: f32", sanitizeName(p.Name)))
+		params = append(params, fmt.Sprintf("%s: %s", sanitizeName(p.Name), wgslType(p.Type)))
 	}
 
 	e.writef("fn %s(%s) -> %s {\n", sanitizeName(fn.Name), strings.Join(params, ", "), retType)
@@ -265,7 +269,7 @@ func (e *Emitter) emitFunction(fn *ir.Function) error {
 	// Emit local variable declarations for non-parameter locals.
 	for i := len(fn.Params); i < len(fn.Locals); i++ {
 		local := fn.Locals[i]
-		e.writef("var %s: f32 = 0.0;\n", sanitizeName(local.Name))
+		e.writef("var %s: %s = %s;\n", sanitizeName(local.Name), wgslType(local.Type), zeroLiteral(local.Type))
 	}
 
 	for _, stmt := range fn.Body {
@@ -383,6 +387,8 @@ func (e *Emitter) scanExpr(expr ir.IRExpr) {
 		}
 	case *ir.TupleRef:
 		e.scanExpr(ex.Tuple)
+	case *ir.ComponentRef:
+		e.scanExpr(ex.Vector)
 	}
 }
 
@@ -415,6 +421,32 @@ func sampleReturnType(output ir.OutputType) string {
 		return "vec4<f32>"
 	default:
 		return "f32"
+	}
+}
+
+func wgslType(typ ir.Type) string {
+	switch typ {
+	case ir.TypeVec2:
+		return "vec2<f32>"
+	case ir.TypeVec3:
+		return "vec3<f32>"
+	case ir.TypeVec4:
+		return "vec4<f32>"
+	default:
+		return "f32"
+	}
+}
+
+func zeroLiteral(typ ir.Type) string {
+	switch typ {
+	case ir.TypeVec2:
+		return "vec2<f32>(0.0, 0.0)"
+	case ir.TypeVec3:
+		return "vec3<f32>(0.0, 0.0, 0.0)"
+	case ir.TypeVec4:
+		return "vec4<f32>(0.0, 0.0, 0.0, 0.0)"
+	default:
+		return "0.0"
 	}
 }
 

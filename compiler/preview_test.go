@@ -39,6 +39,38 @@ func TestCompileForPreviewSuccess(t *testing.T) {
 	if artifact.Sampler == nil {
 		t.Fatal("expected cpu sampler")
 	}
+	if artifact.Diagnostics != nil {
+		t.Fatalf("expected nil diagnostics, got %#v", artifact.Diagnostics)
+	}
+}
+
+func TestCompileForPreviewIncludesWarningsOnSuccess(t *testing.T) {
+	root, filePath := writeTempEffect(t, "shadow_builtin_warning", `module "effects/shadow_builtin_warning"
+effect "Shadow Builtin Warning"
+output scalar
+function sample(width, height, x, y, index, phase, params)
+  cross = x + y
+  return cross
+end
+`)
+
+	artifact, err := compiler.CompileForPreview(filePath, nil, compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err != nil {
+		t.Fatalf("compile for preview: %v", err)
+	}
+	if len(artifact.Diagnostics) != 1 {
+		t.Fatalf("diagnostic count = %d, want 1", len(artifact.Diagnostics))
+	}
+	diag := artifact.Diagnostics[0]
+	if diag.Severity != "warning" {
+		t.Fatalf("severity = %q, want warning", diag.Severity)
+	}
+	if diag.Code != "W001" {
+		t.Fatalf("code = %q, want W001", diag.Code)
+	}
 }
 
 func TestCompileForPreviewDiagnostics(t *testing.T) {

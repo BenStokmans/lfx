@@ -7,7 +7,10 @@ import (
 
 	"github.com/BenStokmans/lfx/compiler"
 	"github.com/BenStokmans/lfx/ir"
+	"github.com/BenStokmans/lfx/lower"
 	"github.com/BenStokmans/lfx/modules"
+	"github.com/BenStokmans/lfx/parser"
+	"github.com/BenStokmans/lfx/sema"
 	"github.com/BenStokmans/lfx/stdlib"
 )
 
@@ -65,5 +68,60 @@ end
 	})
 	if err == nil {
 		t.Fatal("expected compile to fail for unsupported multi-assignment")
+	}
+}
+
+func TestLowerPreservesVectorTypes(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/vector_lower"
+effect "Vector Lower"
+output rgb
+function tint(pos)
+  return vec3(pos.x, pos.y, 0.25)
+end
+function sample(width, height, x, y, index, phase, params)
+  pos = normalize(vec2(x, y) + 1.0)
+  return tint(pos)
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected semantic errors: %v", errs)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected semantic warnings: %v", warns)
+	}
+
+	irmod, err := lower.Lower(mod, nil, info, nil)
+	if err != nil {
+		t.Fatalf("lower source: %v", err)
+	}
+
+	if irmod.Sample == nil {
+		t.Fatal("sample function missing")
+	}
+	if irmod.Sample.Body[len(irmod.Sample.Body)-1].(*ir.Return).Values[0].ResultType() != ir.TypeVec3 {
+		t.Fatalf("sample return type = %s, want vec3", irmod.Sample.Body[len(irmod.Sample.Body)-1].(*ir.Return).Values[0].ResultType())
+	}
+
+	var tint *ir.Function
+	for _, fn := range irmod.Functions {
+		if fn.Name == "tint" {
+			tint = fn
+			break
+		}
+	}
+	if tint == nil {
+		t.Fatal("tint function missing")
+	}
+	if tint.Params[0].Type != ir.TypeVec2 {
+		t.Fatalf("tint param type = %s, want vec2", tint.Params[0].Type)
+	}
+	if tint.ReturnType != ir.TypeVec3 {
+		t.Fatalf("tint return type = %s, want vec3", tint.ReturnType)
 	}
 }

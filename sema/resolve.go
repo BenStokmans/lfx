@@ -54,7 +54,10 @@ func (a *analyzer) resolveStmt(stmt parser.Stmt, scope *Scope, currentFunc strin
 		// First assignment introduces a new local in the current scope.
 		sym := scope.Lookup(s.Name)
 		a.resolveExpr(s.Value, scope, currentFunc)
-		if sym == nil {
+		if sym == nil || sym.Kind == SymBuiltin {
+			if sym != nil && sym.Kind == SymBuiltin {
+				a.addWarning(s.Pos, WarnBuiltinShadowed, fmt.Sprintf("local %q shadows builtin %q", s.Name, s.Name))
+			}
 			_ = scope.Define(s.Name, &Symbol{
 				Name: s.Name,
 				Kind: SymLocal,

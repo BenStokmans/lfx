@@ -21,8 +21,10 @@ func (e *Emitter) emitExpr(expr ir.IRExpr) string {
 	case *ir.BinaryOp:
 		left := e.emitExpr(ex.Left)
 		right := e.emitExpr(ex.Right)
+		left = e.coerceExpr(left, ex.Left.ResultType(), ex.Typ)
+		right = e.coerceExpr(right, ex.Right.ResultType(), ex.Typ)
 		if ex.Op == ir.OpMod {
-			return fmt.Sprintf("lfx_mod(%s, %s)", left, right)
+			return fmt.Sprintf("(%s - %s * floor(%s / %s))", left, right, left, right)
 		}
 		if isComparisonOp(ex.Op) {
 			op := mapBinaryOp(ex.Op)
@@ -60,11 +62,15 @@ func (e *Emitter) emitExpr(expr ir.IRExpr) string {
 		for i, a := range ex.Args {
 			args[i] = e.emitExpr(a)
 		}
-		return e.emitBuiltinCall(ex.Builtin, args)
+		return e.emitBuiltinCall(ex, args)
 
 	case *ir.TupleRef:
 		inner := e.emitExpr(ex.Tuple)
 		return fmt.Sprintf("%s.v%d", inner, ex.Index)
+
+	case *ir.ComponentRef:
+		inner := e.emitExpr(ex.Vector)
+		return fmt.Sprintf("%s.%s", inner, componentName(ex.Index))
 
 	default:
 		return fmt.Sprintf("/* unknown expr %T */", expr)
@@ -102,6 +108,13 @@ func (e *Emitter) emitConst(c *ir.Const) string {
 	}
 }
 
+func (e *Emitter) coerceExpr(expr string, from, to ir.Type) string {
+	if !to.IsVector() || from.IsVector() || from == ir.TypeUnknown {
+		return expr
+	}
+	return fmt.Sprintf("%s(%s)", wgslType(to), expr)
+}
+
 // formatFloat formats a float64 as a WGSL f32 literal, always with a decimal point.
 func formatFloat(f float64) string {
 	s := fmt.Sprintf("%g", f)
@@ -110,6 +123,19 @@ func formatFloat(f float64) string {
 		s += ".0"
 	}
 	return s
+}
+
+func componentName(index int) string {
+	switch index {
+	case 0:
+		return "x"
+	case 1:
+		return "y"
+	case 2:
+		return "z"
+	default:
+		return "w"
+	}
 }
 
 func mapBinaryOp(op ir.Op) string {

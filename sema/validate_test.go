@@ -247,3 +247,64 @@ end
 		t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrEffectMissingOutput)
 	}
 }
+
+func TestAnalyzeInfersVectorFunctionSignatures(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/vector_infer"
+effect "Vector Infer"
+output scalar
+function helper(pos)
+  shifted = normalize(pos + 1.0)
+  return shifted.x + shifted.y
+end
+function sample(width, height, x, y, index, phase, params)
+  return helper(vec2(x, y))
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected semantic errors: %v", errs)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected semantic warnings: %v", warns)
+	}
+
+	helper := mod.Funcs[0]
+	sig := info.FuncTypes[helper]
+	if len(sig.Params) != 1 || sig.Params[0].String() != "vec2" {
+		t.Fatalf("helper params = %#v, want vec2", sig.Params)
+	}
+	if sig.ReturnType.String() != "f32" {
+		t.Fatalf("helper return type = %s, want f32", sig.ReturnType)
+	}
+}
+
+func TestAnalyzeAllowsShadowingBuiltinWithAssignment(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/shadow_builtin"
+effect "Shadow Builtin"
+output scalar
+function sample(width, height, x, y, index, phase, params)
+  cross = x + y
+  return cross
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	_, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected semantic errors: %v", errs)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("warning count = %d, want 1", len(warns))
+	}
+	if warns[0].Code != sema.WarnBuiltinShadowed {
+		t.Fatalf("warning code = %s, want %s", warns[0].Code, sema.WarnBuiltinShadowed)
+	}
+}

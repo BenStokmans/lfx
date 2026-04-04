@@ -221,7 +221,7 @@ func (a *App) CompilePreview(req CompileRequest) (*CompileResponse, error) {
 		Params:        mapParams(artifact.Params),
 		BoundParams:   artifact.BoundParams,
 		Timeline:      mapTimeline(artifact.Timeline),
-		Diagnostics:   nil,
+		Diagnostics:   mapDiagnostics(artifact.Diagnostics),
 	}, nil
 }
 

@@ -36,7 +36,14 @@ end
 		t.Fatalf("unexpected semantic errors: %v", errs)
 	}
 
-	irmod, err := lower.Lower(mod, nil)
+	info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected semantic errors: %v", errs)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected semantic warnings: %v", warns)
+	}
+	irmod, err := lower.Lower(mod, nil, info, nil)
 	if err != nil {
 		t.Fatalf("lower source: %v", err)
 	}
@@ -118,10 +125,14 @@ end
 			if err != nil {
 				t.Fatalf("parse source: %v", err)
 			}
-			if errs := sema.Analyze(mod, nil); len(errs) != 0 {
+			info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+			if len(errs) != 0 {
 				t.Fatalf("unexpected semantic errors: %v", errs)
 			}
-			irmod, err := lower.Lower(mod, nil)
+			if len(warns) != 0 {
+				t.Fatalf("unexpected semantic warnings: %v", warns)
+			}
+			irmod, err := lower.Lower(mod, nil, info, nil)
 			if err != nil {
 				t.Fatalf("lower source: %v", err)
 			}
@@ -138,5 +149,52 @@ end
 				}
 			}
 		})
+	}
+}
+
+func TestEmitSupportsVectorFunctionsAndReturns(t *testing.T) {
+	mod, err := parser.Parse(`module "effects/vector_emit"
+effect "Vector Emit"
+output rgb
+function tint(pos)
+  return vec3(pos.x, pos.y, 0.25)
+end
+function sample(width, height, x, y, index, phase, params)
+  pos = normalize(vec2(x, y) + 1.0)
+  return tint(pos)
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	info, errs, warns := sema.AnalyzeModule(mod, nil, nil)
+	if len(errs) != 0 {
+		t.Fatalf("unexpected semantic errors: %v", errs)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected semantic warnings: %v", warns)
+	}
+
+	irmod, err := lower.Lower(mod, nil, info, nil)
+	if err != nil {
+		t.Fatalf("lower source: %v", err)
+	}
+
+	wgslSource, err := wgsl.Emit(irmod)
+	if err != nil {
+		t.Fatalf("emit wgsl: %v", err)
+	}
+
+	required := []string{
+		"fn tint(pos: vec2<f32>) -> vec3<f32> {",
+		"var pos: vec2<f32> = vec2<f32>(0.0, 0.0);",
+		"normalize((vec2<f32>(x, y) + vec2<f32>(1.0)))",
+		"return vec3<f32>(pos.x, pos.y, 0.25);",
+	}
+	for _, needle := range required {
+		if !strings.Contains(wgslSource, needle) {
+			t.Fatalf("wgsl output missing %q:\n%s", needle, wgslSource)
+		}
 	}
 }

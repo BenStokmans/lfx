@@ -78,6 +78,16 @@ const (
 	BuiltinMod
 	BuiltinPow
 	BuiltinIsEven
+	BuiltinVec2
+	BuiltinVec3
+	BuiltinVec4
+	BuiltinDot
+	BuiltinLength
+	BuiltinDistance
+	BuiltinNormalize
+	BuiltinCross
+	BuiltinProject
+	BuiltinReflect
 	BuiltinPerlin
 	BuiltinVoronoi
 	BuiltinVoronoiBorder
@@ -114,6 +124,26 @@ func (b BuiltinID) String() string {
 		return "pow"
 	case BuiltinIsEven:
 		return "is_even"
+	case BuiltinVec2:
+		return "vec2"
+	case BuiltinVec3:
+		return "vec3"
+	case BuiltinVec4:
+		return "vec4"
+	case BuiltinDot:
+		return "dot"
+	case BuiltinLength:
+		return "length"
+	case BuiltinDistance:
+		return "distance"
+	case BuiltinNormalize:
+		return "normalize"
+	case BuiltinCross:
+		return "cross"
+	case BuiltinProject:
+		return "project"
+	case BuiltinReflect:
+		return "reflect"
 	case BuiltinPerlin:
 		return "perlin"
 	case BuiltinVoronoi:
@@ -213,3 +243,13 @@ type TupleRef struct {
 
 func (*TupleRef) irExprNode()        {}
 func (t *TupleRef) ResultType() Type { return t.Typ }
+
+// ComponentRef extracts a single lane from a vector value.
+type ComponentRef struct {
+	Vector IRExpr
+	Index  int
+	Typ    Type
+}
+
+func (*ComponentRef) irExprNode()        {}
+func (c *ComponentRef) ResultType() Type { return c.Typ }

@@ -20,34 +20,33 @@ end
 function sample(width, height, x, y, index, phase, params)
   cx = (width - 1.0) / 2.0
   cy = (height - 1.0) / 2.0
+  center = vec2(cx, cy)
   w_even = is_even(width)
   h_even = is_even(height)
-  dx = abs(x - cx)
-  dy = abs(y - cy)
+  offset = abs(vec2(x, y) - center)
   if params.grid_aligned then
     if w_even > 0.0 then
-      dx = dx - 0.5
+      offset = offset - vec2(0.5, 0.0)
     end
   end
   if params.grid_aligned then
     if h_even > 0.0 then
-      dy = dy - 0.5
+      offset = offset - vec2(0.0, 0.5)
     end
   end
-  dist = sqrt(dx * dx + dy * dy)
-  mx = abs(0.0 - cx)
-  my = abs(0.0 - cy)
+  dist = length(offset)
+  corner = abs(vec2(0.0, 0.0) - center)
   if params.grid_aligned then
     if w_even > 0.0 then
-      mx = mx - 0.5
+      corner = corner - vec2(0.5, 0.0)
     end
   end
   if params.grid_aligned then
     if h_even > 0.0 then
-      my = my - 0.5
+      corner = corner - vec2(0.0, 0.5)
     end
   end
-  max_radius = sqrt(mx * mx + my * my)
+  max_radius = length(corner)
   span = ceil(max_radius) + 1.0 + params.rampsize
   t = triangle_phase(phase) * span
   pos = t - dist

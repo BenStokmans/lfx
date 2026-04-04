@@ -277,6 +277,16 @@ function sample(width, height, x, y, index, phase, params)
 end
 ```
 
+`sample` may also return a single vector value for multi-channel outputs:
+
+```lfx
+output rgb
+
+function sample(width, height, x, y, index, phase, params)
+  return vec3(x / width, y / height, phase)
+end
+```
+
 Notes from the current implementation:
 
 - variables are function-local by default
@@ -294,6 +304,7 @@ Supported literals:
 - floats
 - strings
 - booleans: `true`, `false`
+- vectors via `vec2(...)`, `vec3(...)`, `vec4(...)`
 
 Supported operators:
 
@@ -324,10 +335,34 @@ dist = abs(x) + abs(y)
 return clamp(pulse * 0.5 + 0.5, 0.0, 1.0)
 ```
 
+### Vectors
+
+LFX supports first-class `vec2`, `vec3`, and `vec4` values.
+
+- constructors: `vec2(x, y)`, `vec3(x, y, z)`, `vec4(x, y, z, w)`
+- fields: `.x`, `.y`, `.z`, `.w`
+- color aliases: `.r`, `.g`, `.b`, `.w`
+- arithmetic supports vector-vector operations with matching widths
+- scalar arithmetic broadcasts over vectors, for example `vec2(x, y) + 1.0`
+- comparison and boolean operators remain scalar-only
+
+Examples:
+
+```lfx
+pos = vec2(x, y)
+center = vec2((width - 1.0) / 2.0, (height - 1.0) / 2.0)
+offset = normalize(pos - center)
+energy = dot(offset, vec2(1.0, 1.0))
+return clamp(energy, 0.0, 1.0)
+```
+
 ## Builtins
 
 Semantic analysis recognizes these bare builtin names:
 
+- `vec2`
+- `vec3`
+- `vec4`
 - `abs`
 - `min`
 - `max`
@@ -342,6 +377,25 @@ Semantic analysis recognizes these bare builtin names:
 - `mod`
 - `pow`
 - `is_even`
+- `dot`
+- `length`
+- `distance`
+- `normalize`
+- `cross`
+- `project`
+- `reflect`
+
+Builtins that already operated on scalars, such as `abs`, `min`, `max`, `clamp`, `mix`, `fract`, `mod`, and `pow`, are lifted element-wise over vectors.
+
+Noise lives in the standard library rather than the core builtin set. Import `std/noise` and call its exported helpers:
+
+```lfx
+import "std/noise" as noise
+
+function sample(width, height, x, y, index, phase, params)
+  return noise.perlin3(x, y, phase)
+end
+```
 
 ## Comments
 
@@ -369,6 +423,8 @@ The analyzer in [`sema`](../sema) currently enforces:
 - every referenced identifier must resolve in lexical scope
 - recursion, including mutual recursion, is rejected
 - `sample` return arity must match the declared output channel count
+- vector field access must match the vector width
+- vector arithmetic requires matching vector widths unless one side is a scalar
 
 ## Variable binding model
 
@@ -393,14 +449,9 @@ The parser and semantic passes feed a shared IR in [`ir`](../ir). Lowering curre
 - mangles imported function names
 - lowers `params.name` to `ParamRef`
 - lowers recognized builtins to explicit `BuiltinCall` nodes
+- preserves inferred vector types for function params, locals, and returns
 
-The IR already has support for:
-
-- arithmetic and comparison operators
-- branches
-- calls
-- returns
-- multi-value returns for `sample`
+The IR already has support for arithmetic, comparison, branches, calls, returns, vector values, vector field extraction, and legacy multi-value returns for `sample`.
 
 Constant folding exists as a placeholder and is currently a no-op.
 
@@ -408,7 +459,6 @@ Constant folding exists as a placeholder and is currently a no-op.
 
 The draft specification and technical plan describe a broader end state than this repo currently implements. Important gaps or rough edges visible in the code today:
 
-- the lowerer currently defaults most function parameters and locals to numeric IR types
 - module header scanning in the import graph builder is lightweight and line-based rather than a full parse
 
 Those are implementation-status notes, not part of the intended language design.

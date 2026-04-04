@@ -112,3 +112,50 @@ end
 		})
 	}
 }
+
+func TestEvaluatorSupportsVectorSampleReturns(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		ret    string
+		want   []float32
+	}{
+		{name: "rgb", output: "output rgb", ret: "vec3(0.25, 0.5, 1.0)", want: []float32{0.25, 0.5, 1}},
+		{name: "rgbw", output: "output rgbw", ret: "vec4(0.25, 0.5, 1.0, 0.75)", want: []float32{0.25, 0.5, 1, 0.75}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			filePath := filepath.Join(root, "effect.lfx")
+			source := `module "effects/vector_output"
+effect "Vector Output"
+` + tc.output + `
+function sample(width, height, x, y, index, phase, params)
+  return ` + tc.ret + `
+end
+`
+			if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+				t.Fatalf("write effect: %v", err)
+			}
+			result, err := compiler.CompileFile(filePath, compiler.Options{BaseDir: root})
+			if err != nil {
+				t.Fatalf("compile file: %v", err)
+			}
+			params, err := runtime.Bind(result.IR.Params, nil)
+			if err != nil {
+				t.Fatalf("bind params: %v", err)
+			}
+			layout := runtime.Layout{Width: 1, Height: 1, Points: []runtime.Point{{Index: 0, X: 0, Y: 0}}}
+			values, err := cpu.NewEvaluator(result.IR).SamplePoint(layout, 0, 0, params)
+			if err != nil {
+				t.Fatalf("sample point: %v", err)
+			}
+			for idx := range tc.want {
+				if values[idx] != tc.want[idx] {
+					t.Fatalf("value[%d] = %f, want %f", idx, values[idx], tc.want[idx])
+				}
+			}
+		})
+	}
+}
