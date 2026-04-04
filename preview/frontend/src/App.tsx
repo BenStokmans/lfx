@@ -135,7 +135,12 @@ function App() {
           if (cancelled || !canvasRef.current) {
             return;
           }
-          drawLayout(canvasRef.current, layout, Float32Array.from(cpu.points, (point) => point.value));
+          drawLayout(
+            canvasRef.current,
+            layout,
+            Float32Array.from(cpu.points.flatMap((point) => point.values)),
+            activeCompile.outputType ?? "scalar",
+          );
           setRenderError("");
           setParityStatus(`CPU preview mode across ${cpu.points.length} samples`);
           return;
@@ -149,13 +154,14 @@ function App() {
           wgsl: activeCompile.wgsl,
           layout,
           phase,
+          outputType: activeCompile.outputType ?? "scalar",
           params: activeCompile.params,
           boundParams: paramOverrides,
         });
         if (cancelled || !canvasRef.current) {
           return;
         }
-        drawLayout(canvasRef.current, layout, values);
+        drawLayout(canvasRef.current, layout, values, activeCompile.outputType ?? "scalar");
         setRenderError("");
 
         const sampleCount = Math.min(layout.points.length, 64);
@@ -171,8 +177,14 @@ function App() {
         }
 
         let maxDelta = 0;
+        const channels = activeCompile.outputType === "rgb" ? 3 : activeCompile.outputType === "rgbw" ? 4 : 1;
         for (let i = 0; i < cpu.points.length; i++) {
-          maxDelta = Math.max(maxDelta, Math.abs(cpu.points[i].value - (values[i] ?? 0)));
+          for (let channel = 0; channel < channels; channel++) {
+            maxDelta = Math.max(
+              maxDelta,
+              Math.abs((cpu.points[i].values[channel] ?? 0) - (values[i * channels + channel] ?? 0)),
+            );
+          }
         }
         setParityStatus(`CPU/GPU max delta ${maxDelta.toFixed(5)} across ${cpu.points.length} samples`);
       } catch (error) {
@@ -399,6 +411,7 @@ function App() {
         <div className="editor-preview-grid">
           <section className="editor-panel">
             <Editor
+              height="100%"
               theme="vs-dark"
               path={selectedFilePath}
               language="lua"

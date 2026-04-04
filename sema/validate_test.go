@@ -12,6 +12,7 @@ func TestAnalyzeFillIrisAllowsParamsObject(t *testing.T) {
 version "0.1"
 module "effects/fill_iris"
 effect "fill_iris"
+output scalar
 
 params {
   rampsize = int(4, 0, 100)
@@ -63,6 +64,7 @@ func TestAnalyzeUnknownParamField(t *testing.T) {
 	mod, err := parser.Parse(`
 module "effects/bad_param"
 effect "bad_param"
+output scalar
 params {
   width_scale = float(1.0, 0.0, 2.0)
 }
@@ -88,6 +90,7 @@ func TestAnalyzeParameterAndPresetValidation(t *testing.T) {
 		mod, err := parser.Parse(`
 module "effects/bad_param_bounds"
 effect "bad_param_bounds"
+output scalar
 params {
   gain = float(1.5, 0.0, 1.0)
 }
@@ -112,6 +115,7 @@ end
 		mod, err := parser.Parse(`
 module "effects/good_param_bounds"
 effect "good_param_bounds"
+output scalar
 params {
   gain = float(0.75, 0.0, 1.0)
 }
@@ -133,6 +137,7 @@ end
 		mod, err := parser.Parse(`
 module "effects/bad_timeline"
 effect "bad_timeline"
+output scalar
 function sample(width, height, x, y, index, phase, params)
   return phase
 end
@@ -158,6 +163,7 @@ timeline {
 		mod, err := parser.Parse(`
 module "effects/good_timeline"
 effect "good_timeline"
+output scalar
 function sample(width, height, x, y, index, phase, params)
   return phase
 end
@@ -175,4 +181,69 @@ timeline {
 			t.Fatalf("unexpected semantic errors: %v", errs)
 		}
 	})
+}
+
+func TestAnalyzeRejectsOutputInLibrary(t *testing.T) {
+	mod, err := parser.Parse(`
+module "stdlib/rgb"
+library "rgb"
+output rgb
+export function shade(v)
+  return v
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	errs := sema.Analyze(mod, nil)
+	if len(errs) == 0 {
+		t.Fatal("expected semantic error")
+	}
+	if errs[0].Code != sema.ErrOutputInLibrary {
+		t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrOutputInLibrary)
+	}
+}
+
+func TestAnalyzeRejectsReturnArityMismatch(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/bad_rgb"
+effect "Bad RGB"
+output rgb
+function sample(width, height, x, y, index, phase, params)
+  return phase
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	errs := sema.Analyze(mod, nil)
+	if len(errs) == 0 {
+		t.Fatal("expected semantic error")
+	}
+	if errs[0].Code != sema.ErrReturnArityMismatch {
+		t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrReturnArityMismatch)
+	}
+}
+
+func TestAnalyzeRejectsMissingOutput(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/missing_output"
+effect "Missing Output"
+function sample(width, height, x, y, index, phase, params)
+  return phase
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+
+	errs := sema.Analyze(mod, nil)
+	if len(errs) == 0 {
+		t.Fatal("expected semantic error")
+	}
+	if errs[0].Code != sema.ErrEffectMissingOutput {
+		t.Fatalf("first error code = %s, want %s", errs[0].Code, sema.ErrEffectMissingOutput)
+	}
 }

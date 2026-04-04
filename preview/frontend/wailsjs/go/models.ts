@@ -164,26 +164,18 @@ export namespace main {
 	        this.column = source["column"];
 	    }
 	}
-	export class PresetData {
-	    name: string;
-	    speed: number;
-	    start: number;
-	    loopStart: number;
-	    loopEnd: number;
-	    finish: number;
+	export class TimelineData {
+	    loopStart?: number;
+	    loopEnd?: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new PresetData(source);
+	        return new TimelineData(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.speed = source["speed"];
-	        this.start = source["start"];
 	        this.loopStart = source["loopStart"];
 	        this.loopEnd = source["loopEnd"];
-	        this.finish = source["finish"];
 	    }
 	}
 	export class ParamData {
@@ -213,10 +205,11 @@ export namespace main {
 	    workspaceRoot: string;
 	    filePath: string;
 	    modulePath?: string;
+	    outputType?: string;
 	    wgsl?: string;
 	    params: ParamData[];
 	    boundParams?: Record<string, any>;
-	    presets: PresetData[];
+	    timeline?: TimelineData;
 	    diagnostics: DiagnosticData[];
 	
 	    static createFrom(source: any = {}) {
@@ -229,10 +222,11 @@ export namespace main {
 	        this.workspaceRoot = source["workspaceRoot"];
 	        this.filePath = source["filePath"];
 	        this.modulePath = source["modulePath"];
+	        this.outputType = source["outputType"];
 	        this.wgsl = source["wgsl"];
 	        this.params = this.convertValues(source["params"], ParamData);
 	        this.boundParams = source["boundParams"];
-	        this.presets = this.convertValues(source["presets"], PresetData);
+	        this.timeline = this.convertValues(source["timeline"], TimelineData);
 	        this.diagnostics = this.convertValues(source["diagnostics"], DiagnosticData);
 	    }
 	
@@ -258,12 +252,11 @@ export namespace main {
 	
 	
 	
-	
 	export class SamplePointData {
 	    index: number;
 	    x: number;
 	    y: number;
-	    value: number;
+	    values: number[];
 	
 	    static createFrom(source: any = {}) {
 	        return new SamplePointData(source);
@@ -274,7 +267,7 @@ export namespace main {
 	        this.index = source["index"];
 	        this.x = source["x"];
 	        this.y = source["y"];
-	        this.value = source["value"];
+	        this.values = source["values"];
 	    }
 	}
 	export class SampleRequest {
@@ -359,6 +352,7 @@ export namespace main {
 	        this.content = source["content"];
 	    }
 	}
+	
 
 }
 

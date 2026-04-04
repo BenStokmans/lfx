@@ -13,6 +13,7 @@ import (
 func TestEmitConvertsSourceSyntaxToWGSLSafeOutput(t *testing.T) {
 	mod, err := parser.Parse(`module "effects/backend_syntax"
 effect "Backend Syntax"
+output scalar
 params {
   gain = float(0.75, 0.0, 1.0)
 }
@@ -70,5 +71,72 @@ end
 		if strings.Contains(wgslSource, needle) {
 			t.Fatalf("wgsl output contains backend-invalid source syntax %q:\n%s", needle, wgslSource)
 		}
+	}
+}
+
+func TestEmitSupportsOutputTypes(t *testing.T) {
+	cases := []struct {
+		name      string
+		output    string
+		returns   string
+		signature string
+		writes    []string
+	}{
+		{
+			name:      "scalar",
+			output:    "output scalar",
+			returns:   "return phase",
+			signature: "-> f32",
+			writes:    []string{"output[idx] = result;"},
+		},
+		{
+			name:      "rgb",
+			output:    "output rgb",
+			returns:   "return x, y, phase",
+			signature: "-> vec3<f32>",
+			writes:    []string{"output[idx * 3u + 0u]", "output[idx * 3u + 1u]", "output[idx * 3u + 2u]", "return vec3<f32>(x, y, phase);"},
+		},
+		{
+			name:      "rgbw",
+			output:    "output rgbw",
+			returns:   "return x, y, phase, 0.25",
+			signature: "-> vec4<f32>",
+			writes:    []string{"output[idx * 4u + 0u]", "output[idx * 4u + 1u]", "output[idx * 4u + 2u]", "output[idx * 4u + 3u]", "return vec4<f32>(x, y, phase, 0.25);"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			source := `module "effects/output_test"
+effect "Output Test"
+` + tc.output + `
+function sample(width, height, x, y, index, phase, params)
+  ` + tc.returns + `
+end
+`
+			mod, err := parser.Parse(source)
+			if err != nil {
+				t.Fatalf("parse source: %v", err)
+			}
+			if errs := sema.Analyze(mod, nil); len(errs) != 0 {
+				t.Fatalf("unexpected semantic errors: %v", errs)
+			}
+			irmod, err := lower.Lower(mod, nil)
+			if err != nil {
+				t.Fatalf("lower source: %v", err)
+			}
+			wgslSource, err := wgsl.Emit(irmod)
+			if err != nil {
+				t.Fatalf("emit wgsl: %v", err)
+			}
+			if !strings.Contains(wgslSource, tc.signature) {
+				t.Fatalf("wgsl output missing signature %q:\n%s", tc.signature, wgslSource)
+			}
+			for _, write := range tc.writes {
+				if !strings.Contains(wgslSource, write) {
+					t.Fatalf("wgsl output missing %q:\n%s", write, wgslSource)
+				}
+			}
+		})
 	}
 }

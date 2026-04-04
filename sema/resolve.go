@@ -85,8 +85,8 @@ func (a *analyzer) resolveStmt(stmt parser.Stmt, scope *Scope, currentFunc strin
 		}
 
 	case *parser.ReturnStmt:
-		if s.Value != nil {
-			a.resolveExpr(s.Value, scope, currentFunc)
+		for _, value := range s.Values {
+			a.resolveExpr(value, scope, currentFunc)
 		}
 
 	case *parser.ExprStmt:

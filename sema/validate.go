@@ -87,7 +87,10 @@ func Analyze(mod *parser.Module, importedModules map[string]*parser.Module) []Er
 		a.resolveFunc(fn)
 	}
 
-	// 6. Check for recursion.
+	// 6. Validate sample return arity against output declaration.
+	a.validateReturnArity()
+
+	// 7. Check for recursion.
 	a.checkRecursion()
 
 	return a.errors
@@ -161,6 +164,13 @@ func (a *analyzer) checkModuleConstraints() {
 func (a *analyzer) checkEffectConstraints() {
 	// Effect modules must have exactly one "sample" function.
 	var sampleFn *parser.FuncDecl
+	if a.mod.Output == nil {
+		pos := parser.Pos{Line: 1, Col: 1}
+		if a.mod.Effect != nil {
+			pos = a.mod.Effect.Pos
+		}
+		a.addError(pos, ErrEffectMissingOutput, "effect modules must declare an output type")
+	}
 	for _, fn := range a.mod.Funcs {
 		if fn.Name == "sample" {
 			sampleFn = fn
@@ -190,4 +200,45 @@ func (a *analyzer) checkLibraryConstraints() {
 	if a.mod.Timeline != nil {
 		a.addError(a.mod.Timeline.Pos, ErrLibraryHasTimeline, "library modules must not have a timeline block")
 	}
+	if a.mod.Output != nil {
+		a.addError(a.mod.Output.Pos, ErrOutputInLibrary, "library modules must not declare an output type")
+	}
+}
+
+func (a *analyzer) validateReturnArity() {
+	var sampleFn *parser.FuncDecl
+	for _, fn := range a.mod.Funcs {
+		if fn.Name == "sample" {
+			sampleFn = fn
+			break
+		}
+	}
+	if sampleFn == nil {
+		return
+	}
+
+	expected := parser.OutputScalar.Channels()
+	if a.mod.Output != nil {
+		expected = a.mod.Output.Type.Channels()
+	}
+
+	var walk func([]parser.Stmt)
+	walk = func(stmts []parser.Stmt) {
+		for _, stmt := range stmts {
+			switch s := stmt.(type) {
+			case *parser.ReturnStmt:
+				if len(s.Values) != 0 && len(s.Values) != expected {
+					a.addError(s.Pos, ErrReturnArityMismatch, fmt.Sprintf("sample return arity mismatch: output expects %d values, got %d", expected, len(s.Values)))
+				}
+			case *parser.IfStmt:
+				walk(s.Body)
+				for _, elseif := range s.ElseIfs {
+					walk(elseif.Body)
+				}
+				walk(s.ElseBody)
+			}
+		}
+	}
+
+	walk(sampleFn.Body)
 }

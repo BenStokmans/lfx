@@ -1,9 +1,30 @@
 package ir
 
+// OutputType describes how many channels the sample function emits.
+type OutputType int
+
+const (
+	OutputScalar OutputType = iota
+	OutputRGB
+	OutputRGBW
+)
+
+func (t OutputType) Channels() int {
+	switch t {
+	case OutputRGB:
+		return 3
+	case OutputRGBW:
+		return 4
+	default:
+		return 1
+	}
+}
+
 // Module is the flattened compilation unit consumed by backends.
 type Module struct {
 	Name       string
 	SourcePath string
+	Output     OutputType
 	Params     []ParamSpec
 	Functions  []*Function
 	Sample     *Function     // pointer to the sample function
@@ -14,7 +35,7 @@ type Module struct {
 type ParamType int
 
 const (
-	ParamInt   ParamType = iota
+	ParamInt ParamType = iota
 	ParamFloat
 	ParamBool
 	ParamEnum

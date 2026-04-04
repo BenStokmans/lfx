@@ -24,6 +24,7 @@ const (
 	TOKEN_AS
 	TOKEN_EXPORT
 	TOKEN_EFFECT
+	TOKEN_OUTPUT
 	TOKEN_PARAMS
 	TOKEN_TIMELINE
 	TOKEN_FUNCTION
@@ -40,18 +41,18 @@ const (
 	TOKEN_FALSE
 
 	// Operators
-	TOKEN_PLUS     // +
-	TOKEN_MINUS    // -
-	TOKEN_STAR     // *
-	TOKEN_SLASH    // /
-	TOKEN_PERCENT  // %
-	TOKEN_EQ       // ==
-	TOKEN_NEQ      // ~=
-	TOKEN_LT       // <
-	TOKEN_GT       // >
-	TOKEN_LTE      // <=
-	TOKEN_GTE      // >=
-	TOKEN_ASSIGN   // =
+	TOKEN_PLUS    // +
+	TOKEN_MINUS   // -
+	TOKEN_STAR    // *
+	TOKEN_SLASH   // /
+	TOKEN_PERCENT // %
+	TOKEN_EQ      // ==
+	TOKEN_NEQ     // ~=
+	TOKEN_LT      // <
+	TOKEN_GT      // >
+	TOKEN_LTE     // <=
+	TOKEN_GTE     // >=
+	TOKEN_ASSIGN  // =
 
 	// Punctuation
 	TOKEN_LPAREN // (
@@ -82,6 +83,7 @@ var tokenNames = map[TokenType]string{
 	TOKEN_AS:       "as",
 	TOKEN_EXPORT:   "export",
 	TOKEN_EFFECT:   "effect",
+	TOKEN_OUTPUT:   "output",
 	TOKEN_PARAMS:   "params",
 	TOKEN_TIMELINE: "timeline",
 	TOKEN_FUNCTION: "function",
@@ -137,6 +139,7 @@ var keywords = map[string]TokenType{
 	"as":       TOKEN_AS,
 	"export":   TOKEN_EXPORT,
 	"effect":   TOKEN_EFFECT,
+	"output":   TOKEN_OUTPUT,
 	"params":   TOKEN_PARAMS,
 	"timeline": TOKEN_TIMELINE,
 	"function": TOKEN_FUNCTION,

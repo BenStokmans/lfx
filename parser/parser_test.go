@@ -94,3 +94,54 @@ end
 		}
 	})
 }
+
+func TestParseOutputDeclarationAndMultiReturn(t *testing.T) {
+	mod, err := parser.Parse(`
+module "effects/rgb"
+effect "RGB"
+output rgb
+function sample(width, height, x, y, index, phase, params)
+  return x, y, phase
+end
+`)
+	if err != nil {
+		t.Fatalf("parse source: %v", err)
+	}
+	if mod.Output == nil || mod.Output.Type != parser.OutputRGB {
+		t.Fatalf("output = %#v, want rgb", mod.Output)
+	}
+	ret, ok := mod.Funcs[0].Body[0].(*parser.ReturnStmt)
+	if !ok {
+		t.Fatalf("expected return stmt, got %T", mod.Funcs[0].Body[0])
+	}
+	if len(ret.Values) != 3 {
+		t.Fatalf("return value count = %d, want 3", len(ret.Values))
+	}
+}
+
+func TestParseOutputVariants(t *testing.T) {
+	cases := map[string]parser.OutputType{
+		"scalar": parser.OutputScalar,
+		"rgb":    parser.OutputRGB,
+		"rgbw":   parser.OutputRGBW,
+	}
+
+	for literal, want := range cases {
+		t.Run(literal, func(t *testing.T) {
+			mod, err := parser.Parse(`
+module "effects/output_test"
+effect "Output Test"
+output ` + literal + `
+function sample(width, height, x, y, index, phase, params)
+  return 0.0
+end
+`)
+			if err != nil {
+				t.Fatalf("parse source: %v", err)
+			}
+			if mod.Output == nil || mod.Output.Type != want {
+				t.Fatalf("output = %#v, want %v", mod.Output, want)
+			}
+		})
+	}
+}

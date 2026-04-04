@@ -53,8 +53,12 @@ func Lower(mod *parser.Module, importedModules map[string]*parser.Module) (*ir.M
 		irmod: &ir.Module{
 			Name:       mod.ModPath,
 			SourcePath: mod.ModPath,
+			Output:     ir.OutputScalar,
 		},
 		paramNames: make(map[string]ir.Type),
+	}
+	if mod.Output != nil {
+		l.irmod.Output = toIROutputType(mod.Output.Type)
 	}
 
 	// Convert params.
@@ -117,6 +121,9 @@ func (l *Lowerer) lowerFunction(fn *parser.FuncDecl, name, source string) (*ir.F
 		Exported: fn.Exported,
 		Source:   source,
 	}
+	if fn.Name == "sample" {
+		irFn.MultiRet = l.irmod.Output.Channels()
+	}
 
 	// Create local slots for function parameters.
 	for _, paramName := range fn.Params {
@@ -135,6 +142,13 @@ func (l *Lowerer) lowerFunction(fn *parser.FuncDecl, name, source string) (*ir.F
 			return nil, err
 		}
 		if irStmt != nil {
+			if ret, ok := irStmt.(*ir.Return); ok && len(ret.Values) > 1 {
+				if irFn.MultiRet == 0 {
+					irFn.MultiRet = len(ret.Values)
+				} else if irFn.MultiRet != len(ret.Values) {
+					return nil, fmt.Errorf("inconsistent return arity in function %s", fn.Name)
+				}
+			}
 			irFn.Body = append(irFn.Body, irStmt)
 		}
 	}
@@ -143,6 +157,17 @@ func (l *Lowerer) lowerFunction(fn *parser.FuncDecl, name, source string) (*ir.F
 	irFn.ReturnType = ir.TypeF32 // default return type
 
 	return irFn, nil
+}
+
+func toIROutputType(t parser.OutputType) ir.OutputType {
+	switch t {
+	case parser.OutputRGB:
+		return ir.OutputRGB
+	case parser.OutputRGBW:
+		return ir.OutputRGBW
+	default:
+		return ir.OutputScalar
+	}
 }
 
 // allocLocal allocates a new local variable slot and returns its index.
@@ -216,24 +241,8 @@ func (l *Lowerer) lowerLocalStmt(s *parser.LocalStmt) (ir.IRStmt, error) {
 	}
 
 	// Multiple bindings with multiple values: a, b = expr1, expr2
-	// Lower the first one and return it; the rest would need special handling.
-	// For now, handle by creating the first declaration.
 	if len(s.Names) > 0 && len(s.Values) == len(s.Names) {
-		var init ir.IRExpr
-		if len(s.Values) > 0 {
-			var err error
-			init, err = l.lowerExpr(s.Values[0])
-			if err != nil {
-				return nil, err
-			}
-		}
-		idx := l.allocLocal(s.Names[0], ir.TypeF32)
-		return &ir.LocalDecl{
-			Index: idx,
-			Name:  s.Names[0],
-			Typ:   ir.TypeF32,
-			Init:  init,
-		}, nil
+		return nil, fmt.Errorf("multiple bindings with multiple values are not supported")
 	}
 
 	return nil, fmt.Errorf("unsupported local statement with %d names and %d values", len(s.Names), len(s.Values))
@@ -307,15 +316,15 @@ func (l *Lowerer) lowerIfStmt(s *parser.IfStmt) (ir.IRStmt, error) {
 
 // lowerReturnStmt converts an AST ReturnStmt to an IR Return.
 func (l *Lowerer) lowerReturnStmt(s *parser.ReturnStmt) (ir.IRStmt, error) {
-	var val ir.IRExpr
-	if s.Value != nil {
-		var err error
-		val, err = l.lowerExpr(s.Value)
-		if err != nil {
-			return nil, err
-		}
+	if len(s.Values) == 0 {
+		return &ir.Return{}, nil
 	}
-	return &ir.Return{Value: val}, nil
+
+	values, err := l.lowerExprs(s.Values)
+	if err != nil {
+		return nil, err
+	}
+	return &ir.Return{Values: values}, nil
 }
 
 // lowerExprStmt converts an AST ExprStmt to an IR ExprStmt.

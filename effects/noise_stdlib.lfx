@@ -2,6 +2,7 @@ version "0.1"
 module "effects/noise_stdlib"
 import "std/noise" as noise
 effect "Noise Stdlib"
+output scalar
 
 function sample(width, height, x, y, index, phase, params)
   px = x / max(width, 1.0)

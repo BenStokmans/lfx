@@ -12,6 +12,7 @@ import (
 
 const filledEffect = `module "effects/filled"
 effect "filled"
+output scalar
 function sample(width, height, x, y, index, phase, params)
   return 1.0
 end

@@ -3,6 +3,7 @@ package modules
 import (
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 )
@@ -25,8 +26,12 @@ func NewFileResolver(roots ...string) *FileResolver {
 // Resolve searches each root for path.lfx.
 // For example, "std/math" searches each root for "std/math.lfx".
 func (r *FileResolver) Resolve(path string) ([]byte, error) {
+	normalized, err := normalizeModulePath(path)
+	if err != nil {
+		return nil, err
+	}
 	for _, root := range r.Roots {
-		for _, full := range candidatePaths(root, path) {
+		for _, full := range candidatePaths(root, normalized) {
 			data, err := os.ReadFile(full)
 			if err == nil {
 				return data, nil
@@ -36,7 +41,7 @@ func (r *FileResolver) Resolve(path string) ([]byte, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("module %q not found in any root", path)
+	return nil, fmt.Errorf("module %q not found in any root", normalized)
 }
 
 func candidatePaths(root, modPath string) []string {
@@ -66,4 +71,23 @@ func candidatePaths(root, modPath string) []string {
 		unique = append(unique, candidate)
 	}
 	return unique
+}
+
+func normalizeModulePath(modPath string) (string, error) {
+	if modPath == "" {
+		return "", fmt.Errorf("module path is required")
+	}
+	if strings.Contains(modPath, "\\") {
+		return "", fmt.Errorf("invalid module path %q", modPath)
+	}
+
+	cleaned := pathpkg.Clean(modPath)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || pathpkg.IsAbs(cleaned) {
+		return "", fmt.Errorf("invalid module path %q", modPath)
+	}
+	if cleaned != modPath {
+		return "", fmt.Errorf("module path %q must be normalized", modPath)
+	}
+
+	return cleaned, nil
 }

@@ -154,22 +154,22 @@ func runSample(args []string) error {
 
 	evaluator := cpu.NewEvaluator(result.IR)
 	type pointValue struct {
-		Index uint32  `json:"index"`
-		X     float32 `json:"x"`
-		Y     float32 `json:"y"`
-		Value float32 `json:"value"`
+		Index  uint32    `json:"index"`
+		X      float32   `json:"x"`
+		Y      float32   `json:"y"`
+		Values []float32 `json:"values"`
 	}
 	points := make([]pointValue, 0, len(layout.Points))
 	for i, pt := range layout.Points {
-		value, err := evaluator.SamplePoint(layout, i, float32(*phase), boundParams)
+		values, err := evaluator.SamplePoint(layout, i, float32(*phase), boundParams)
 		if err != nil {
 			return err
 		}
 		points = append(points, pointValue{
-			Index: pt.Index,
-			X:     pt.X,
-			Y:     pt.Y,
-			Value: value,
+			Index:  pt.Index,
+			X:      pt.X,
+			Y:      pt.Y,
+			Values: values,
 		})
 	}
 

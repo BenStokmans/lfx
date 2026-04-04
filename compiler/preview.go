@@ -29,6 +29,7 @@ type PreviewArtifact struct {
 	FilePath     string               `json:"filePath"`
 	BaseDir      string               `json:"baseDir"`
 	ModulePath   string               `json:"modulePath"`
+	OutputType   string               `json:"outputType"`
 	WGSL         string               `json:"wgsl"`
 	Params       []ir.ParamSpec       `json:"params"`
 	BoundParams  map[string]any       `json:"boundParams"`
@@ -77,6 +78,7 @@ func CompileForPreview(filePath string, overrides map[string]any, opts Options) 
 		FilePath:     filePath,
 		BaseDir:      result.BaseDir,
 		ModulePath:   result.Entry.ModPath,
+		OutputType:   outputTypeName(result.IR.Output),
 		WGSL:         wgslSource,
 		Params:       append([]ir.ParamSpec(nil), result.IR.Params...),
 		BoundParams:  cloneMap(boundParams.Values),
@@ -86,6 +88,17 @@ func CompileForPreview(filePath string, overrides map[string]any, opts Options) 
 		Sampler:      cpu.NewEvaluator(result.IR),
 		BoundRuntime: boundParams,
 	}, nil
+}
+
+func outputTypeName(output ir.OutputType) string {
+	switch output {
+	case ir.OutputRGB:
+		return "rgb"
+	case ir.OutputRGBW:
+		return "rgbw"
+	default:
+		return "scalar"
+	}
 }
 
 // DiagnosticsFromError converts compiler errors into UI-friendly diagnostics.

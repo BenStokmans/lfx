@@ -60,6 +60,7 @@ export interface CompileResponse {
   workspaceRoot: string;
   filePath: string;
   modulePath?: string;
+  outputType?: "scalar" | "rgb" | "rgbw";
   wgsl?: string;
   params: ParamData[];
   boundParams?: Record<string, unknown>;
@@ -71,7 +72,7 @@ export interface SamplePointData {
   index: number;
   x: number;
   y: number;
-  value: number;
+  values: number[];
 }
 
 export interface SampleResponse {

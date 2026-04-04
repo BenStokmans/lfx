@@ -46,6 +46,7 @@ type CompileResponse struct {
 	WorkspaceRoot string           `json:"workspaceRoot"`
 	FilePath      string           `json:"filePath"`
 	ModulePath    string           `json:"modulePath,omitempty"`
+	OutputType    string           `json:"outputType,omitempty"`
 	WGSL          string           `json:"wgsl,omitempty"`
 	Params        []ParamData      `json:"params"`
 	BoundParams   map[string]any   `json:"boundParams,omitempty"`
@@ -91,8 +92,8 @@ type SampleResponse struct {
 }
 
 type SamplePointData struct {
-	Index uint32  `json:"index"`
-	X     float32 `json:"x"`
-	Y     float32 `json:"y"`
-	Value float32 `json:"value"`
+	Index  uint32    `json:"index"`
+	X      float32   `json:"x"`
+	Y      float32   `json:"y"`
+	Values []float32 `json:"values"`
 }

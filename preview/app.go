@@ -28,11 +28,13 @@ type App struct {
 	ctx          context.Context
 	mu           sync.RWMutex
 	compilations map[string]*compilationSession
+	workspaces   map[string]struct{}
 }
 
 func NewApp() *App {
 	return &App{
 		compilations: make(map[string]*compilationSession),
+		workspaces:   make(map[string]struct{}),
 	}
 }
 
@@ -68,10 +70,13 @@ func (a *App) OpenWorkspace() (*WorkspaceData, error) {
 }
 
 func (a *App) LoadWorkspace(root string) (*WorkspaceData, error) {
-	root = filepath.Clean(root)
+	root, err := canonicalPath(root, false)
+	if err != nil {
+		return nil, err
+	}
 	effects := make([]EffectFileData, 0, 16)
 
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -108,6 +113,8 @@ func (a *App) LoadWorkspace(root string) (*WorkspaceData, error) {
 		return nil, err
 	}
 
+	a.rememberWorkspace(root)
+
 	sort.Slice(effects, func(i, j int) bool {
 		return effects[i].RelativePath < effects[j].RelativePath
 	})
@@ -119,6 +126,9 @@ func (a *App) LoadWorkspace(root string) (*WorkspaceData, error) {
 }
 
 func (a *App) ReadSourceFile(path string) (string, error) {
+	if err := a.ensurePathInKnownWorkspace(path, false); err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
@@ -129,6 +139,9 @@ func (a *App) ReadSourceFile(path string) (string, error) {
 func (a *App) SaveSourceFile(req SaveSourceRequest) error {
 	if req.Path == "" {
 		return errors.New("save path is required")
+	}
+	if err := a.ensurePathInKnownWorkspace(req.Path, true); err != nil {
+		return err
 	}
 	if err := os.WriteFile(req.Path, []byte(req.Content), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", req.Path, err)
@@ -171,6 +184,10 @@ func (a *App) CompilePreview(req CompileRequest) (*CompileResponse, error) {
 	if workspaceRoot == "" {
 		workspaceRoot = compiler.DetectBaseDir(req.FilePath)
 	}
+	if err := a.ensurePathInWorkspace(workspaceRoot, req.FilePath, false); err != nil {
+		return nil, err
+	}
+	a.rememberWorkspace(workspaceRoot)
 
 	artifact, err := compiler.CompileForPreview(req.FilePath, req.Overrides, compiler.Options{
 		BaseDir:  workspaceRoot,
@@ -199,6 +216,7 @@ func (a *App) CompilePreview(req CompileRequest) (*CompileResponse, error) {
 		WorkspaceRoot: workspaceRoot,
 		FilePath:      req.FilePath,
 		ModulePath:    artifact.ModulePath,
+		OutputType:    artifact.OutputType,
 		WGSL:          artifact.WGSL,
 		Params:        mapParams(artifact.Params),
 		BoundParams:   artifact.BoundParams,
@@ -237,15 +255,15 @@ func (a *App) SampleCompiledFrame(req SampleRequest) (*SampleResponse, error) {
 	points := make([]SamplePointData, 0, limit)
 	for i := 0; i < limit; i++ {
 		pt := layout.Points[i]
-		value, err := session.artifact.Sampler.SamplePoint(layout, i, req.Phase, bound)
+		values, err := session.artifact.Sampler.SamplePoint(layout, i, req.Phase, bound)
 		if err != nil {
 			return nil, err
 		}
 		points = append(points, SamplePointData{
-			Index: pt.Index,
-			X:     pt.X,
-			Y:     pt.Y,
-			Value: value,
+			Index:  pt.Index,
+			X:      pt.X,
+			Y:      pt.Y,
+			Values: values,
 		})
 	}
 
@@ -258,6 +276,86 @@ func defaultWorkspaceRoot() string {
 		return "."
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
+}
+
+func (a *App) rememberWorkspace(root string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.workspaces[root] = struct{}{}
+}
+
+func (a *App) ensurePathInKnownWorkspace(target string, allowMissingLeaf bool) error {
+	a.mu.RLock()
+	roots := make([]string, 0, len(a.workspaces))
+	for root := range a.workspaces {
+		roots = append(roots, root)
+	}
+	a.mu.RUnlock()
+
+	for _, root := range roots {
+		if err := ensurePathInRoot(root, target, allowMissingLeaf); err == nil {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("path %q is outside the loaded workspaces", target)
+}
+
+func (a *App) ensurePathInWorkspace(root, target string, allowMissingLeaf bool) error {
+	canonicalRoot, err := canonicalPath(root, false)
+	if err != nil {
+		return err
+	}
+	if err := ensurePathInRoot(canonicalRoot, target, allowMissingLeaf); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ensurePathInRoot(root, target string, allowMissingLeaf bool) error {
+	canonicalRoot, err := canonicalPath(root, false)
+	if err != nil {
+		return err
+	}
+	canonicalTarget, err := canonicalPath(target, allowMissingLeaf)
+	if err != nil {
+		return err
+	}
+
+	rel, err := filepath.Rel(canonicalRoot, canonicalTarget)
+	if err != nil {
+		return fmt.Errorf("resolve %q relative to %q: %w", canonicalTarget, canonicalRoot, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path %q is outside workspace root %q", target, canonicalRoot)
+	}
+	return nil
+}
+
+func canonicalPath(value string, allowMissingLeaf bool) (string, error) {
+	if value == "" {
+		return "", errors.New("path is required")
+	}
+
+	abs, err := filepath.Abs(filepath.Clean(value))
+	if err != nil {
+		return "", fmt.Errorf("absolute path for %q: %w", value, err)
+	}
+
+	if !allowMissingLeaf {
+		resolved, err := filepath.EvalSymlinks(abs)
+		if err != nil {
+			return "", fmt.Errorf("resolve path %q: %w", value, err)
+		}
+		return resolved, nil
+	}
+
+	parent := filepath.Dir(abs)
+	resolvedParent, err := filepath.EvalSymlinks(parent)
+	if err != nil {
+		return "", fmt.Errorf("resolve parent for %q: %w", value, err)
+	}
+	return filepath.Join(resolvedParent, filepath.Base(abs)), nil
 }
 
 func mapParams(params []ir.ParamSpec) []ParamData {

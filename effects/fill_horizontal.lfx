@@ -1,5 +1,6 @@
 module "effects/fill_horizontal"
 effect "fill_horizontal"
+output scalar
 
 function sample(width, height, x, y, index, phase, params)
   span = max(width - 1.0, 1.0)

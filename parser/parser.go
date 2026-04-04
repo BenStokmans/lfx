@@ -162,6 +162,15 @@ func (p *Parser) ParseModule() (*Module, error) {
 		mod.Library = &LibraryDecl{Pos: tok.Pos, Name: nameTok.Literal}
 	}
 
+	// output (optional)
+	if p.current().Type == TOKEN_OUTPUT {
+		decl, err := p.parseOutputDecl()
+		if err != nil {
+			return nil, err
+		}
+		mod.Output = decl
+	}
+
 	// params (optional)
 	if p.current().Type == TOKEN_PARAMS {
 		decl, err := p.parseParamsDecl()
@@ -238,6 +247,31 @@ func (p *Parser) parseImportDecl() (*ImportDecl, error) {
 		decl.Alias = aliasTok.Literal
 	}
 	return decl, nil
+}
+
+func (p *Parser) parseOutputDecl() (*OutputDecl, error) {
+	tok := p.advance() // consume 'output'
+	typeTok, err := p.expect(TOKEN_IDENT)
+	if err != nil {
+		return nil, &ParseError{Msg: "expected output type (scalar, rgb, rgbw)", Pos: tok.Pos}
+	}
+
+	var outputType OutputType
+	switch typeTok.Literal {
+	case "scalar":
+		outputType = OutputScalar
+	case "rgb":
+		outputType = OutputRGB
+	case "rgbw":
+		outputType = OutputRGBW
+	default:
+		return nil, &ParseError{
+			Msg: fmt.Sprintf("unknown output type %q", typeTok.Literal),
+			Pos: typeTok.Pos,
+		}
+	}
+
+	return &OutputDecl{Pos: tok.Pos, Type: outputType}, nil
 }
 
 func (p *Parser) parseParamsDecl() (*ParamsDecl, error) {
@@ -676,7 +710,15 @@ func (p *Parser) parseReturnStmt() (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ReturnStmt{Pos: tok.Pos, Value: expr}, nil
+	values := []Expr{expr}
+	for p.match(TOKEN_COMMA) {
+		value, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return &ReturnStmt{Pos: tok.Pos, Values: values}, nil
 }
 
 func (p *Parser) parseExprStmt() (Stmt, error) {

@@ -27,7 +27,14 @@ func NewEvaluator(mod *ir.Module) *Evaluator {
 }
 
 // SamplePoint implements runtime.Sampler.
-func (e *Evaluator) SamplePoint(layout runtime.Layout, pointIndex int, phase float32, params *runtime.BoundParams) (float32, error) {
+func (e *Evaluator) SamplePoint(layout runtime.Layout, pointIndex int, phase float32, params *runtime.BoundParams) ([]float32, error) {
+	if pointIndex < 0 || pointIndex >= len(layout.Points) {
+		return nil, fmt.Errorf("point index %d out of range", pointIndex)
+	}
+	if e.module == nil || e.module.Sample == nil {
+		return nil, fmt.Errorf("sample function is not available")
+	}
+
 	pt := layout.Points[pointIndex]
 
 	args := []float64{
@@ -42,15 +49,19 @@ func (e *Evaluator) SamplePoint(layout runtime.Layout, pointIndex int, phase flo
 
 	results, err := e.execFunc(e.module.Sample, args, params)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	if len(results) == 0 {
-		return 0, fmt.Errorf("sample function returned no value")
+	channels := e.module.Output.Channels()
+	if len(results) < channels {
+		return nil, fmt.Errorf("sample function returned %d values, expected %d", len(results), channels)
 	}
 
-	v := results[0]
-	v = math.Max(0, math.Min(1, v))
-	return float32(v), nil
+	out := make([]float32, channels)
+	for i := 0; i < channels; i++ {
+		v := math.Max(0, math.Min(1, results[i]))
+		out[i] = float32(v)
+	}
+	return out, nil
 }
 
 // frame holds the local variables and bound params for a single function invocation.
@@ -60,6 +71,9 @@ type frame struct {
 }
 
 func (e *Evaluator) execFunc(fn *ir.Function, args []float64, params *runtime.BoundParams) ([]float64, error) {
+	if fn == nil {
+		return nil, fmt.Errorf("function is nil")
+	}
 	f := &frame{
 		locals: make([]float64, len(fn.Locals)),
 		params: params,
@@ -155,12 +169,16 @@ func (e *Evaluator) execStmt(stmt ir.IRStmt, f *frame) (returnVal []float64, did
 		}
 
 	case *ir.Return:
-		if s.Value == nil {
+		if len(s.Values) == 0 {
 			return nil, true, nil
 		}
-		vals, err := e.evalExprMulti(s.Value, f)
-		if err != nil {
-			return nil, false, err
+		vals := make([]float64, 0, len(s.Values))
+		for _, expr := range s.Values {
+			value, err := e.evalExpr(expr, f)
+			if err != nil {
+				return nil, false, err
+			}
+			vals = append(vals, value)
 		}
 		return vals, true, nil
 

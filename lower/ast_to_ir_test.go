@@ -1,6 +1,7 @@
 package lower_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -35,5 +36,34 @@ func TestLowerFillIrisCompilesWithoutRemovedStdHelpers(t *testing.T) {
 	}
 	if multiLocalDecls != 0 {
 		t.Fatalf("multi-local decl count = %d, want 0", multiLocalDecls)
+	}
+}
+
+func TestCompileFileRejectsUnsupportedMultiAssignment(t *testing.T) {
+	root := t.TempDir()
+	effectsDir := filepath.Join(root, "effects")
+	if err := os.MkdirAll(effectsDir, 0o755); err != nil {
+		t.Fatalf("create effects dir: %v", err)
+	}
+
+	filePath := filepath.Join(effectsDir, "bad_multi_assign.lfx")
+	source := `module "effects/bad_multi_assign"
+effect "Bad Multi Assign"
+
+function sample(width, height, x, y, index, phase, params)
+  a, b = 1.0, 2.0
+  return a
+end
+`
+	if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+		t.Fatalf("write effect file: %v", err)
+	}
+
+	_, err := compiler.CompileFile(filePath, compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err == nil {
+		t.Fatal("expected compile to fail for unsupported multi-assignment")
 	}
 }

@@ -24,6 +24,9 @@ func TestCompileForPreviewSuccess(t *testing.T) {
 	if artifact.ModulePath != "effects/fill_iris" {
 		t.Fatalf("module path = %q", artifact.ModulePath)
 	}
+	if artifact.OutputType != "scalar" {
+		t.Fatalf("output type = %q, want scalar", artifact.OutputType)
+	}
 	if len(artifact.Params) == 0 {
 		t.Fatal("expected params")
 	}
@@ -61,6 +64,7 @@ func TestCompileForPreviewReportsSyntaxViolationsAndAcceptsValidSource(t *testin
 	t.Run("invalid syntax returns structured diagnostic", func(t *testing.T) {
 		root, filePath := writeTempEffect(t, "missing_then", `module "effects/missing_then"
 effect "Missing Then"
+output scalar
 function sample(width, height, x, y, index, phase, params)
   if phase < 0.5
     return 0.0
@@ -95,8 +99,8 @@ end
 		if !strings.Contains(diag.Message, "expected then, got return") {
 			t.Fatalf("message = %q, want parse error about missing then", diag.Message)
 		}
-		if diag.Line != 5 || diag.Column != 5 {
-			t.Fatalf("position = %d:%d, want 5:5", diag.Line, diag.Column)
+		if diag.Line != 6 || diag.Column != 5 {
+			t.Fatalf("position = %d:%d, want 6:5", diag.Line, diag.Column)
 		}
 		if diag.FilePath != filePath {
 			t.Fatalf("file path = %q, want %q", diag.FilePath, filePath)
@@ -106,6 +110,7 @@ end
 	t.Run("valid source compiles cleanly", func(t *testing.T) {
 		root, filePath := writeTempEffect(t, "with_then", `module "effects/with_then"
 effect "With Then"
+output scalar
 function sample(width, height, x, y, index, phase, params)
   if phase < 0.5 then
     return 0.0

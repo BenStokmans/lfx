@@ -42,7 +42,7 @@ func (*IfStmt) irStmtNode() {}
 
 // Return returns a value from a function.
 type Return struct {
-	Value IRExpr // nil for void returns
+	Values []IRExpr // empty for void returns
 }
 
 func (*Return) irStmtNode() {}

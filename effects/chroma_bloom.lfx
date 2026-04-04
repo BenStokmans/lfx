@@ -1,0 +1,47 @@
+version "0.1"
+module "effects/chroma_bloom"
+effect "chroma_bloom"
+output rgb
+
+params {
+  bloom = float(0.72, 0.2, 1.6)
+  swirl = float(1.4, 0.4, 3.0)
+  spokes = float(7.0, 2.0, 14.0)
+  speed = float(1.0, 0.5, 1.5)
+}
+
+function pulse(t)
+  return 0.5 + 0.5 * sin(t)
+end
+
+function sample(width, height, x, y, index, phase, params)
+  cx = (width - 1.0) / 2.0
+  cy = (height - 1.0) / 2.0
+
+  nx = (x - cx) / max(width, 1.0)
+  ny = (y - cy) / max(height, 1.0)
+  radius = sqrt(nx * nx + ny * ny)
+  diag = nx + ny
+  cross = nx - ny
+
+  drift = phase * 6.28318
+  ring = pulse(radius * 18.0 * params.bloom - drift)
+  star = pulse(cross * params.spokes * 2.7 + drift * 2.0)
+  halo = clamp(1.0 - radius * 3.1, 0.0, 1.0)
+  shimmer = pulse(diag * (8.0 + params.speed * 4.0) + drift * 3.0)
+  lattice = pulse(nx * ny * params.spokes * 12.0 - drift * 2.0)
+  orbit = pulse((diag * diag - cross * cross) * (6.0 + params.swirl * 3.0) + drift)
+
+  energy = clamp(halo * 0.42 + ring * 0.22 + star * 0.16 + lattice * 0.1 + orbit * 0.1, 0.0, 1.0)
+
+  r = clamp(energy * (0.38 + 0.62 * pulse(radius * 11.0 + drift)) + shimmer * halo * 0.16, 0.0, 1.0)
+  g = clamp(energy * (0.34 + 0.66 * pulse(diag * 4.5 + drift * 2.0 + 2.09439)) + ring * 0.1, 0.0, 1.0)
+  b = clamp(energy * (0.4 + 0.6 * pulse(cross * 4.0 - drift * 3.0 + 4.18878)) + star * 0.08 + lattice * 0.06, 0.0, 1.0)
+
+  return r, g, b
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
+}

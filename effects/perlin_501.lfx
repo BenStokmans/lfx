@@ -2,6 +2,7 @@ version "0.1"
 module "effects/perlin_501"
 import "std/noise" as noise
 effect "501_Perlin"
+output scalar
 
 params {
   hsize = int(8, 1, 100)

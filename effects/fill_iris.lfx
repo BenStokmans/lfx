@@ -1,6 +1,7 @@
 version "0.1"
 module "effects/fill_iris"
 effect "fill_iris"
+output scalar
 
 params {
   rampsize = int(4, 0, 100)

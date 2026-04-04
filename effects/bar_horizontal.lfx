@@ -1,5 +1,6 @@
 module "effects/bar_horizontal"
 effect "bar_horizontal"
+output scalar
 
 params {
   ramp = float(1.0, 0.0, 8.0)
@@ -8,14 +9,46 @@ params {
   qty = float(3.0, 1.0, 16.0)
 }
 
+function ease(t)
+  return t * t * (3.0 - 2.0 * t)
+end
+
 function sample(width, height, x, y, index, phase, params)
-  pos = x + phase * (params.ramp + params.high + params.gap)
   period = params.ramp + params.high + params.ramp + params.gap
   if period <= 0.0 then
     return 0.0
   end
+  total_span = period * params.qty
+  intro_end = 0.25
+  loop_end = 0.75
+  reveal_pad = period * 0.5
 
-  local_pos = mod(pos, period * params.qty)
+  scroll = 0.0
+  mask = 1.0
+
+  if phase < intro_end then
+    t = ease(phase / intro_end)
+    scroll = (1.0 - t) * total_span
+    front = -reveal_pad + t * (width + reveal_pad)
+    if x > front then
+      return 0.0
+    end
+  else
+    if phase < loop_end then
+      t = (phase - intro_end) / (loop_end - intro_end)
+      scroll = t * period
+    else
+      t = ease((phase - loop_end) / (1.0 - loop_end))
+      scroll = t * total_span
+      tail = -reveal_pad + t * (width + reveal_pad)
+      if x < tail then
+        return 0.0
+      end
+    end
+  end
+
+  pos = x - scroll
+  local_pos = mod(pos, total_span)
   seg_pos = mod(local_pos, period)
 
   if seg_pos < params.ramp then
@@ -40,3 +73,8 @@ function sample(width, height, x, y, index, phase, params)
 
   return 0.0
 end
+
+timeline {
+  loop_start = 0.25
+  loop_end = 0.75
+}

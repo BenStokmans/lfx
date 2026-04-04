@@ -2,6 +2,7 @@ package wgsl
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/BenStokmans/lfx/ir"
 )
@@ -61,11 +62,21 @@ func (e *Emitter) emitStmt(stmt ir.IRStmt) {
 		e.writeln("}")
 
 	case *ir.Return:
-		if s.Value == nil {
+		if len(s.Values) == 0 {
 			e.writeln("return;")
-		} else {
-			val := e.emitExpr(s.Value)
+		} else if len(s.Values) == 1 {
+			val := e.emitExpr(s.Values[0])
 			e.writef("return %s;\n", val)
+		} else {
+			values := make([]string, 0, len(s.Values))
+			for _, value := range s.Values {
+				values = append(values, e.emitExpr(value))
+			}
+			if e.currentFunc == e.mod.Sample {
+				e.writef("return %s(%s);\n", sampleReturnType(e.mod.Output), strings.Join(values, ", "))
+			} else {
+				e.writef("return %s(%s);\n", multiRetStructName(e.currentFunc.Name, len(s.Values)), strings.Join(values, ", "))
+			}
 		}
 
 	case *ir.ExprStmt:

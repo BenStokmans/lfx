@@ -4,17 +4,17 @@ This document describes the LFX language as it is represented in this repository
 
 ## What LFX is for
 
-LFX is a small DSL for procedural lighting effects. An LFX program computes a scalar value for a single logical point in a lighting layout at a single normalized phase value `phase ∈ [0, 1]`. The host runtime is expected to:
+LFX is a small DSL for procedural lighting effects. An LFX program computes one or more channel values for a single logical point in a lighting layout at a single normalized phase value `phase ∈ [0, 1]`. The host runtime is expected to:
 
 - own playback policy, timing, speed, direction, looping, and release behavior
 - provide layout bounds and point coordinates
 - bind and validate parameter values
-- clamp or otherwise interpret the returned scalar
+- clamp or otherwise interpret the returned channels
 
 In this repo, the sampling contract is represented by [`runtime.Sampler`](../runtime/sample.go):
 
 ```go
-SamplePoint(layout Layout, pointIndex int, phase float32, params *BoundParams) (float32, error)
+SamplePoint(layout Layout, pointIndex int, phase float32, params *BoundParams) ([]float32, error)
 ```
 
 At the source-language level, effect modules are authored around a `sample` function with this shape:
@@ -23,6 +23,14 @@ At the source-language level, effect modules are authored around a `sample` func
 function sample(width, height, x, y, index, phase, params)
   return 0.0
 end
+```
+
+Effect modules must declare an output type:
+
+```lfx
+output scalar
+output rgb
+output rgbw
 ```
 
 For effect modules, semantic analysis currently requires exactly one `sample` function and exactly 7 parameters.
@@ -49,6 +57,7 @@ LFX supports two file kinds.
 Effect modules are end-user effects. They may contain:
 
 - an `effect "Name"` declaration
+- a required `output ...` declaration
 - zero or more imports
 - an optional `params { ... }` block
 - helper functions
@@ -62,6 +71,7 @@ version "0.1"
 module "effects/fill_iris"
 
 effect "Fill Iris"
+output scalar
 
 params {
   radius = float(0.35, 0.0, 1.0)
@@ -90,6 +100,7 @@ Library modules are reusable helper modules. They may contain:
 Library modules must not define:
 
 - `sample`
+- an `output` declaration
 - a `timeline` block
 
 Example:
@@ -209,6 +220,28 @@ Speed, direction, looping policy, and release behavior are entirely runtime-owne
 
 Library modules must not declare a `timeline` block.
 
+## Output Types
+
+Effect modules must declare a module-level output type:
+
+```lfx
+output scalar
+output rgb
+output rgbw
+```
+
+This declaration appears after `effect` or `library` and before `params`.
+
+Channel counts by output type:
+
+- `scalar` → 1 channel
+- `rgb` → 3 channels: red, green, blue
+- `rgbw` → 4 channels: red, green, blue, white
+
+For non-bare `return` statements in `sample`, semantic analysis requires the return arity to match the output channel count.
+
+Library modules must not declare `output`.
+
 ## Statements
 
 The parser currently supports these statements:
@@ -234,12 +267,24 @@ else
 end
 ```
 
+For multi-channel effects, `return` may contain multiple comma-separated expressions:
+
+```lfx
+output rgb
+
+function sample(width, height, x, y, index, phase, params)
+  return x / width, y / height, phase
+end
+```
+
 Notes from the current implementation:
 
 - variables are function-local by default
 - a first assignment introduces a name in the current lexical scope
 - duplicate names in the same scope are rejected
 - recursion is rejected during semantic analysis
+- bare `return` is allowed
+- in `sample`, non-bare return arity must match the declared output channel count
 
 ## Expressions
 
@@ -297,6 +342,7 @@ Semantic analysis recognizes these bare builtin names:
 - `mod`
 - `pow`
 - `is_even`
+
 ## Comments
 
 Single-line comments start with `--`:
@@ -315,11 +361,14 @@ The analyzer in [`sema`](../sema) currently enforces:
 - effect modules must not contain exported functions
 - effect modules must define exactly one `sample` function
 - the `sample` function must have exactly 7 parameters
+- effect modules must declare `output`
 - library modules must not define `sample`
+- library modules must not define `output`
 - library modules must not define a `timeline` block
 - duplicate params, functions, and import aliases are rejected
 - every referenced identifier must resolve in lexical scope
 - recursion, including mutual recursion, is rejected
+- `sample` return arity must match the declared output channel count
 
 ## Variable binding model
 
@@ -338,6 +387,7 @@ end
 The parser and semantic passes feed a shared IR in [`ir`](../ir). Lowering currently:
 
 - converts params into typed IR specs
+- converts an optional `output` declaration into an IR output type
 - converts an optional timeline block into an IR `TimelineSpec` (loop markers only)
 - lowers functions defined in the current module and imported exported functions
 - mangles imported function names
@@ -350,7 +400,7 @@ The IR already has support for:
 - branches
 - calls
 - returns
-- multi-return builtin plumbing
+- multi-value returns for `sample`
 
 Constant folding exists as a placeholder and is currently a no-op.
 
@@ -359,7 +409,6 @@ Constant folding exists as a placeholder and is currently a no-op.
 The draft specification and technical plan describe a broader end state than this repo currently implements. Important gaps or rough edges visible in the code today:
 
 - the lowerer currently defaults most function parameters and locals to numeric IR types
-- the parser accepts `a, b = expr`, and the IR has multi-return support, but full multi-value source-language behavior is still partial
 - module header scanning in the import graph builder is lightweight and line-based rather than a full parse
 
 Those are implementation-status notes, not part of the intended language design.
@@ -370,6 +419,7 @@ Those are implementation-status notes, not part of the intended language design.
 version "0.1"
 module "effects/simple_pulse"
 effect "Simple Pulse"
+output scalar
 
 params {
   intensity = float(1.0, 0.0, 1.0)
@@ -393,6 +443,7 @@ timeline {
 version "0.1"
 module "effects/fill_iris"
 effect "Fill Iris"
+output scalar
 
 params {
   rampsize = int(4, 0, 100)
@@ -437,6 +488,32 @@ timeline {
 }
 ```
 
+## rgb example
+
+```lfx
+version "0.1"
+module "effects/chroma_bloom"
+effect "Chroma Bloom"
+output rgb
+
+params {
+  bloom = float(0.72, 0.2, 1.6)
+}
+
+function sample(width, height, x, y, index, phase, params)
+  pulse = sin(phase * 6.28318) * 0.5 + 0.5
+  r = clamp(pulse, 0.0, 1.0)
+  g = clamp(1.0 - pulse, 0.0, 1.0)
+  b = clamp(0.5 + 0.5 * cos(phase * 6.28318), 0.0, 1.0)
+  return r, g, b
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
+}
+```
+
 ## Repository map
 
 - [`parser`](../parser): tokens, lexer, AST, parser
@@ -445,4 +522,3 @@ timeline {
 - [`lower`](../lower): AST-to-IR lowering and name mangling
 - [`ir`](../ir): shared intermediate representation
 - [`runtime`](../runtime): layout, params, timeline, and sampling contracts
-

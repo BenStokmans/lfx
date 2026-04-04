@@ -190,8 +190,8 @@ func (e *Emitter) markReachableStmt(stmt ir.IRStmt, byName map[string]*ir.Functi
 			e.markReachableStmt(inner, byName, visit)
 		}
 	case *ir.Return:
-		if s.Value != nil {
-			e.markReachableExpr(s.Value, byName, visit)
+		for _, value := range s.Values {
+			e.markReachableExpr(value, byName, visit)
 		}
 	case *ir.ExprStmt:
 		e.markReachableExpr(s.Expr, byName, visit)
@@ -224,7 +224,7 @@ func (e *Emitter) markReachableExpr(expr ir.IRExpr, byName map[string]*ir.Functi
 func (e *Emitter) emitSampleFunction(fn *ir.Function) error {
 	// Emit sample with a dummy params slot so source-level helper calls can pass
 	// `params` through even though `params.name` lowers directly to uniforms.
-	e.writeln("fn lfx_sample(width: f32, height: f32, x: f32, y: f32, index: f32, phase: f32, params: f32) -> f32 {")
+	e.writef("fn lfx_sample(width: f32, height: f32, x: f32, y: f32, index: f32, phase: f32, params: f32) -> %s {\n", sampleReturnType(e.mod.Output))
 	e.indent++
 	e.currentFunc = fn
 
@@ -290,8 +290,20 @@ func (e *Emitter) emitEntryPoint() {
 	e.writeln("}")
 	e.writeln("let pt = points[idx];")
 	e.writeln("var result = lfx_sample(uniforms.width, uniforms.height, pt.x, pt.y, f32(pt.index), uniforms.phase, 0.0);")
-	e.writeln("result = clamp(result, 0.0, 1.0);")
-	e.writeln("output[idx] = result;")
+	switch e.mod.Output {
+	case ir.OutputRGB:
+		e.writeln("output[idx * 3u + 0u] = clamp(result.x, 0.0, 1.0);")
+		e.writeln("output[idx * 3u + 1u] = clamp(result.y, 0.0, 1.0);")
+		e.writeln("output[idx * 3u + 2u] = clamp(result.z, 0.0, 1.0);")
+	case ir.OutputRGBW:
+		e.writeln("output[idx * 4u + 0u] = clamp(result.x, 0.0, 1.0);")
+		e.writeln("output[idx * 4u + 1u] = clamp(result.y, 0.0, 1.0);")
+		e.writeln("output[idx * 4u + 2u] = clamp(result.z, 0.0, 1.0);")
+		e.writeln("output[idx * 4u + 3u] = clamp(result.w, 0.0, 1.0);")
+	default:
+		e.writeln("result = clamp(result, 0.0, 1.0);")
+		e.writeln("output[idx] = result;")
+	}
 	e.indent--
 	e.writeln("}")
 	e.writeln("")
@@ -329,8 +341,8 @@ func (e *Emitter) scanStmt(stmt ir.IRStmt) {
 			e.scanStmt(inner)
 		}
 	case *ir.Return:
-		if s.Value != nil {
-			e.scanExpr(s.Value)
+		for _, value := range s.Values {
+			e.scanExpr(value)
 		}
 	case *ir.ExprStmt:
 		e.scanExpr(s.Expr)
@@ -393,6 +405,17 @@ func (e *Emitter) writef(format string, args ...interface{}) {
 
 func multiRetStructName(funcName string, count int) string {
 	return fmt.Sprintf("%s_Ret%d", sanitizeName(funcName), count)
+}
+
+func sampleReturnType(output ir.OutputType) string {
+	switch output {
+	case ir.OutputRGB:
+		return "vec3<f32>"
+	case ir.OutputRGBW:
+		return "vec4<f32>"
+	default:
+		return "f32"
+	}
 }
 
 var wgslReservedNames = map[string]struct{}{

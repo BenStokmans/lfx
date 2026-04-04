@@ -4,6 +4,7 @@ type RenderRequest = {
   wgsl: string;
   layout: LayoutData;
   phase: number;
+  outputType: "scalar" | "rgb" | "rgbw";
   params: ParamData[];
   boundParams: Record<string, unknown>;
 };
@@ -43,7 +44,7 @@ export class EffectRenderer {
     const pointsBytes = createPointsBuffer(request.layout);
     const uniformBytes = createUniformBuffer(request);
     const pointCount = request.layout.points.length;
-    const outputSize = pointCount * 4;
+    const outputSize = pointCount * channelsForOutput(request.outputType) * 4;
 
     const pointsBuffer = device.createBuffer({
       size: pointsBytes.byteLength,
@@ -133,7 +134,12 @@ export class EffectRenderer {
   }
 }
 
-export function drawLayout(canvas: HTMLCanvasElement, layout: LayoutData, values: Float32Array): void {
+export function drawLayout(
+  canvas: HTMLCanvasElement,
+  layout: LayoutData,
+  values: Float32Array,
+  outputType: "scalar" | "rgb" | "rgbw",
+): void {
   const context = canvas.getContext("2d");
   if (!context) {
     return;
@@ -165,10 +171,28 @@ export function drawLayout(canvas: HTMLCanvasElement, layout: LayoutData, values
   context.strokeRect(18, 18, width - 36, height - 36);
 
   const radius = Math.max(5, Math.min(14, 180 / Math.sqrt(layout.points.length || 1)));
+  const channels = channelsForOutput(outputType);
 
   for (let i = 0; i < layout.points.length; i++) {
     const point = layout.points[i];
-    const value = Math.max(0, Math.min(1, values[i] ?? 0));
+    const offset = i * channels;
+    const scalar = Math.max(0, Math.min(1, values[offset] ?? 0));
+    let red = scalar
+    let green = scalar
+    let blue = scalar
+    let glow = scalar
+    if (outputType === "rgb") {
+      red = Math.max(0, Math.min(1, values[offset] ?? 0));
+      green = Math.max(0, Math.min(1, values[offset + 1] ?? 0));
+      blue = Math.max(0, Math.min(1, values[offset + 2] ?? 0));
+      glow = Math.max(red, green, blue);
+    } else if (outputType === "rgbw") {
+      const white = Math.max(0, Math.min(1, values[offset + 3] ?? 0));
+      red = Math.min(1, Math.max(0, Math.min(1, values[offset] ?? 0)) + white);
+      green = Math.min(1, Math.max(0, Math.min(1, values[offset + 1] ?? 0)) + white);
+      blue = Math.min(1, Math.max(0, Math.min(1, values[offset + 2] ?? 0)) + white);
+      glow = Math.max(red, green, blue);
+    }
     const x =
       extents.spanX === 0
         ? width / 2
@@ -179,10 +203,10 @@ export function drawLayout(canvas: HTMLCanvasElement, layout: LayoutData, values
         : padding + (point.y - extents.minY) * scale + (usableHeight - extents.spanY * scale) / 2;
 
     context.beginPath();
-    context.fillStyle = `rgba(255,255,255,${0.1 + value * 0.9})`;
-    context.shadowColor = `rgba(255,255,255,${0.15 + value * 0.55})`;
-    context.shadowBlur = 10 + value * 24;
-    context.arc(x, y, radius + value * radius * 0.25, 0, Math.PI * 2);
+    context.fillStyle = `rgba(${Math.round(red * 255)},${Math.round(green * 255)},${Math.round(blue * 255)},1)`;
+    context.shadowColor = `rgba(${Math.round(red * 255)},${Math.round(green * 255)},${Math.round(blue * 255)},${0.15 + glow * 0.55})`;
+    context.shadowBlur = 10 + glow * 24;
+    context.arc(x, y, radius + glow * radius * 0.25, 0, Math.PI * 2);
     context.fill();
   }
 
@@ -235,6 +259,17 @@ function coerceUniformValue(value: unknown): number {
 
 function alignTo16(value: number): number {
   return Math.ceil(value / 16) * 16;
+}
+
+function channelsForOutput(outputType: "scalar" | "rgb" | "rgbw"): number {
+  switch (outputType) {
+    case "rgb":
+      return 3;
+    case "rgbw":
+      return 4;
+    default:
+      return 1;
+  }
 }
 
 function getExtents(layout: LayoutData): {

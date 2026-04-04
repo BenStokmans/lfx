@@ -46,13 +46,13 @@ func TestNoiseStdlibEffectSamplesAndEmitsWGSL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("sample point %d: %v", i, err)
 		}
-		if math.IsNaN(float64(value)) {
+		if math.IsNaN(float64(value[0])) {
 			t.Fatalf("sample point %d produced NaN", i)
 		}
-		if value < 0 || value > 1 {
-			t.Fatalf("sample point %d out of range: %f", i, value)
+		if value[0] < 0 || value[0] > 1 {
+			t.Fatalf("sample point %d out of range: %f", i, value[0])
 		}
-		values[i] = value
+		values[i] = value[0]
 	}
 
 	if values[0] == values[1] && values[1] == values[2] {
@@ -63,8 +63,8 @@ func TestNoiseStdlibEffectSamplesAndEmitsWGSL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("repeat sample: %v", err)
 	}
-	if repeat != values[1] {
-		t.Fatalf("repeat sample mismatch: got %f want %f", repeat, values[1])
+	if repeat[0] != values[1] {
+		t.Fatalf("repeat sample mismatch: got %f want %f", repeat[0], values[1])
 	}
 
 	wgslSource, err := wgsl.Emit(result.IR)
