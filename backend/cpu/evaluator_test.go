@@ -4,6 +4,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/BenStokmans/lfx/backend/cpu"
@@ -157,5 +158,241 @@ end
 				}
 			}
 		})
+	}
+}
+
+func TestEvaluatorSamplePointsMatchesScalarForChromaBloom(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	result, err := compiler.CompileFile(filepath.Join(root, "effects", "chroma_bloom.lfx"), compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err != nil {
+		t.Fatalf("compile file: %v", err)
+	}
+
+	params, err := runtime.Bind(result.IR.Params, nil)
+	if err != nil {
+		t.Fatalf("bind params: %v", err)
+	}
+
+	layout := runtime.Layout{
+		Width:  8,
+		Height: 8,
+		Points: make([]runtime.Point, 0, 64),
+	}
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			layout.Points = append(layout.Points, runtime.Point{
+				Index: uint32(len(layout.Points)),
+				X:     float32(x),
+				Y:     float32(y),
+			})
+		}
+	}
+
+	evaluator := cpu.NewEvaluator(result.IR)
+	pointIndices := make([]int, len(layout.Points))
+	for idx := range pointIndices {
+		pointIndices[idx] = idx
+	}
+
+	batched, err := evaluator.SamplePoints(layout, pointIndices, 0.37, params)
+	if err != nil {
+		t.Fatalf("sample points: %v", err)
+	}
+
+	channels := result.IR.Output.Channels()
+	if got, want := len(batched), len(pointIndices)*channels; got != want {
+		t.Fatalf("batched output len = %d, want %d", got, want)
+	}
+
+	for idx := range pointIndices {
+		scalar, err := evaluator.SamplePoint(layout, idx, 0.37, params)
+		if err != nil {
+			t.Fatalf("sample point %d: %v", idx, err)
+		}
+		base := idx * channels
+		for channel := 0; channel < channels; channel++ {
+			if math.Abs(float64(batched[base+channel]-scalar[channel])) > 1e-6 {
+				t.Fatalf("point %d channel %d = %f, want %f", idx, channel, batched[base+channel], scalar[channel])
+			}
+		}
+	}
+}
+
+func TestEvaluatorSamplePointsMatchesScalarForFillIris(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	result, err := compiler.CompileFile(filepath.Join(root, "effects", "fill_iris.lfx"), compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err != nil {
+		t.Fatalf("compile file: %v", err)
+	}
+
+	params, err := runtime.Bind(result.IR.Params, nil)
+	if err != nil {
+		t.Fatalf("bind params: %v", err)
+	}
+
+	layout := runtime.Layout{
+		Width:  5,
+		Height: 5,
+		Points: []runtime.Point{
+			{Index: 0, X: 0, Y: 0},
+			{Index: 1, X: 2, Y: 2},
+			{Index: 2, X: 4, Y: 4},
+		},
+	}
+
+	evaluator := cpu.NewEvaluator(result.IR)
+	batched, err := evaluator.SamplePoints(layout, []int{0, 1, 2}, 0.3, params)
+	if err != nil {
+		t.Fatalf("sample points: %v", err)
+	}
+	if len(batched) != 3 {
+		t.Fatalf("batched len = %d, want 3", len(batched))
+	}
+
+	for idx := range layout.Points {
+		scalar, err := evaluator.SamplePoint(layout, idx, 0.3, params)
+		if err != nil {
+			t.Fatalf("sample point %d: %v", idx, err)
+		}
+		if math.Abs(float64(batched[idx]-scalar[0])) > 1e-6 {
+			t.Fatalf("point %d = %f, want %f", idx, batched[idx], scalar[0])
+		}
+	}
+}
+
+func TestEvaluatorSamplePointsMatchesScalarForPerlin501(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	result, err := compiler.CompileFile(filepath.Join(root, "effects", "perlin_501.lfx"), compiler.Options{
+		BaseDir:  root,
+		Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+	})
+	if err != nil {
+		t.Fatalf("compile file: %v", err)
+	}
+
+	params, err := runtime.Bind(result.IR.Params, nil)
+	if err != nil {
+		t.Fatalf("bind params: %v", err)
+	}
+
+	layout := runtime.Layout{
+		Width:  8,
+		Height: 8,
+		Points: make([]runtime.Point, 0, 64),
+	}
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			layout.Points = append(layout.Points, runtime.Point{
+				Index: uint32(len(layout.Points)),
+				X:     float32(x),
+				Y:     float32(y),
+			})
+		}
+	}
+
+	evaluator := cpu.NewEvaluator(result.IR)
+	pointIndices := make([]int, len(layout.Points))
+	for idx := range pointIndices {
+		pointIndices[idx] = idx
+	}
+
+	batched, err := evaluator.SamplePoints(layout, pointIndices, 0.37, params)
+	if err != nil {
+		t.Fatalf("sample points: %v", err)
+	}
+	if got, want := len(batched), len(pointIndices); got != want {
+		t.Fatalf("batched output len = %d, want %d", got, want)
+	}
+
+	for idx := range layout.Points {
+		scalar, err := evaluator.SamplePoint(layout, idx, 0.37, params)
+		if err != nil {
+			t.Fatalf("sample point %d: %v", idx, err)
+		}
+		if math.Abs(float64(batched[idx]-scalar[0])) > 1e-6 {
+			t.Fatalf("point %d = %f, want %f", idx, batched[idx], scalar[0])
+		}
+	}
+}
+
+func TestEvaluatorSamplePointsMatchesScalarForEffectCorpus(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	entries, err := os.ReadDir(filepath.Join(root, "effects"))
+	if err != nil {
+		t.Fatalf("read effects dir: %v", err)
+	}
+
+	layout := makeGridTestLayout(8, 8)
+	pointIndices := make([]int, len(layout.Points))
+	for idx := range pointIndices {
+		pointIndices[idx] = idx
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".lfx") {
+			continue
+		}
+		t.Run(strings.TrimSuffix(entry.Name(), ".lfx"), func(t *testing.T) {
+			result, err := compiler.CompileFile(filepath.Join(root, "effects", entry.Name()), compiler.Options{
+				BaseDir:  root,
+				Resolver: stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(root)...)),
+			})
+			if err != nil {
+				t.Fatalf("compile file: %v", err)
+			}
+
+			params, err := runtime.Bind(result.IR.Params, nil)
+			if err != nil {
+				t.Fatalf("bind params: %v", err)
+			}
+
+			evaluator := cpu.NewEvaluator(result.IR)
+			batched, err := evaluator.SamplePoints(layout, pointIndices, 0.37, params)
+			if err != nil {
+				t.Fatalf("sample points: %v", err)
+			}
+
+			channels := result.IR.Output.Channels()
+			if got, want := len(batched), len(pointIndices)*channels; got != want {
+				t.Fatalf("batched output len = %d, want %d", got, want)
+			}
+
+			for idx := range pointIndices {
+				scalar, err := evaluator.SamplePoint(layout, idx, 0.37, params)
+				if err != nil {
+					t.Fatalf("sample point %d: %v", idx, err)
+				}
+				base := idx * channels
+				for channel := 0; channel < channels; channel++ {
+					if math.Abs(float64(batched[base+channel]-scalar[channel])) > 1e-6 {
+						t.Fatalf("point %d channel %d = %f, want %f", idx, channel, batched[base+channel], scalar[channel])
+					}
+				}
+			}
+		})
+	}
+}
+
+func makeGridTestLayout(width, height int) runtime.Layout {
+	points := make([]runtime.Point, 0, width*height)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			points = append(points, runtime.Point{
+				Index: uint32(len(points)),
+				X:     float32(x),
+				Y:     float32(y),
+			})
+		}
+	}
+	return runtime.Layout{
+		Width:  float32(width),
+		Height: float32(height),
+		Points: points,
 	}
 }

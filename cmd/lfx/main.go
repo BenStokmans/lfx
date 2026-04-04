@@ -40,6 +40,8 @@ func run(args []string) error {
 		return runGraph(args[1:])
 	case "sample":
 		return runSample(args[1:])
+	case "bench":
+		return runBench(args[1:])
 	case "emit":
 		return runEmit(args[1:])
 	case "emit-wgsl":
@@ -283,7 +285,7 @@ func loadLayout(path string) (runtime.Layout, error) {
 
 func usageError() error {
 	exe := filepath.Base(os.Args[0])
-	return fmt.Errorf("usage: %s <parse|check|graph|sample|emit> [flags] <file.lfx>", exe)
+	return fmt.Errorf("usage: %s <parse|check|graph|sample|bench|emit> [flags] <file.lfx>", exe)
 }
 
 func writeJSON(v any) error {

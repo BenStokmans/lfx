@@ -31,11 +31,11 @@ type voronoiResult struct {
 func builtinPerlin(args []float64) float64 {
 	switch len(args) {
 	case 1:
-		return perlinFBM1(args[0])
+		return builtinPerlin1(args[0])
 	case 2:
-		return perlinFBM2(args[0], args[1])
+		return builtinPerlin2(args[0], args[1])
 	case 3:
-		return perlinFBM3(args[0], args[1], args[2])
+		return builtinPerlin3(args[0], args[1], args[2])
 	default:
 		return 0
 	}
@@ -44,9 +44,9 @@ func builtinPerlin(args []float64) float64 {
 func builtinVoronoi(args []float64) float64 {
 	switch len(args) {
 	case 2:
-		return voronoiNoise2(args[0]/voronoiCellSize, args[1]/voronoiCellSize).random
+		return builtinVoronoi2(args[0], args[1])
 	case 3:
-		return voronoiNoise3(args[0]/voronoiCellSize, args[1]/voronoiCellSize, args[2]/voronoiCellSize).random
+		return builtinVoronoi3(args[0], args[1], args[2])
 	default:
 		return 0
 	}
@@ -56,8 +56,7 @@ func builtinVoronoiBorder(args []float64) float64 {
 	if len(args) != 3 {
 		return 0
 	}
-	noise := voronoiNoise3(args[0]/voronoiCellSize, args[1]/voronoiCellSize, args[2]/voronoiCellSize)
-	return smoothstep(0, voronoiBorderStep, noise.edge)
+	return builtinVoronoiBorder3(args[0], args[1], args[2])
 }
 
 func builtinWorley(args []float64) float64 {
@@ -65,9 +64,53 @@ func builtinWorley(args []float64) float64 {
 		return 0
 	}
 
-	var at [4]float64
-	copy(at[:], args)
-	return worleyDistance(at)
+	switch len(args) {
+	case 2:
+		return builtinWorley2(args[0], args[1])
+	case 3:
+		return builtinWorley3(args[0], args[1], args[2])
+	case 4:
+		return builtinWorley4(args[0], args[1], args[2], args[3])
+	default:
+		return 0
+	}
+}
+
+func builtinPerlin1(x float64) float64 {
+	return perlinFBM1(x)
+}
+
+func builtinPerlin2(x, y float64) float64 {
+	return perlinFBM2(x, y)
+}
+
+func builtinPerlin3(x, y, z float64) float64 {
+	return perlinFBM3(x, y, z)
+}
+
+func builtinVoronoi2(x, y float64) float64 {
+	return voronoiNoise2(x/voronoiCellSize, y/voronoiCellSize).random
+}
+
+func builtinVoronoi3(x, y, z float64) float64 {
+	return voronoiNoise3(x/voronoiCellSize, y/voronoiCellSize, z/voronoiCellSize).random
+}
+
+func builtinVoronoiBorder3(x, y, z float64) float64 {
+	noise := voronoiNoise3(x/voronoiCellSize, y/voronoiCellSize, z/voronoiCellSize)
+	return smoothstep(0, voronoiBorderStep, noise.edge)
+}
+
+func builtinWorley2(x, y float64) float64 {
+	return worleyDistance([4]float64{x, y})
+}
+
+func builtinWorley3(x, y, z float64) float64 {
+	return worleyDistance([4]float64{x, y, z})
+}
+
+func builtinWorley4(x, y, z, w float64) float64 {
+	return worleyDistance([4]float64{x, y, z, w})
 }
 
 func perlinFBM1(x float64) float64 {

@@ -86,13 +86,13 @@ func (e *Evaluator) callBuiltin(id ir.BuiltinID, args []value) (value, error) {
 		projected := evalBinaryValue(ir.OpMul, args[1].Typ, args[1], scale)
 		return evalBinaryValue(ir.OpSub, args[0].Typ, args[0], projected), nil
 	case ir.BuiltinPerlin:
-		return scalarValue(ir.TypeF32, builtinPerlin(flattenNoiseArgs(args))), nil
+		return scalarValue(ir.TypeF32, evalPerlinBuiltin(args)), nil
 	case ir.BuiltinVoronoi:
-		return scalarValue(ir.TypeF32, builtinVoronoi(flattenNoiseArgs(args))), nil
+		return scalarValue(ir.TypeF32, evalVoronoiBuiltin(args)), nil
 	case ir.BuiltinVoronoiBorder:
-		return scalarValue(ir.TypeF32, builtinVoronoiBorder(flattenNoiseArgs(args))), nil
+		return scalarValue(ir.TypeF32, evalVoronoiBorderBuiltin(args)), nil
 	case ir.BuiltinWorley:
-		return scalarValue(ir.TypeF32, builtinWorley(flattenNoiseArgs(args))), nil
+		return scalarValue(ir.TypeF32, evalWorleyBuiltin(args)), nil
 	default:
 		return zeroValue(ir.TypeF32), fmt.Errorf("unknown builtin %v", id)
 	}
@@ -149,15 +149,81 @@ func normalizeValue(v value) value {
 	return mapUnary(v, func(x float64) float64 { return x * inv })
 }
 
-func flattenNoiseArgs(args []value) []float64 {
+func evalPerlinBuiltin(args []value) float64 {
 	if len(args) == 1 && args[0].Typ.IsVector() {
-		out := make([]float64, args[0].laneCount())
-		copy(out, args[0].Lanes[:args[0].laneCount()])
-		return out
+		switch args[0].Typ {
+		case ir.TypeVec2:
+			return builtinPerlin2(args[0].Lanes[0], args[0].Lanes[1])
+		case ir.TypeVec3:
+			return builtinPerlin3(args[0].Lanes[0], args[0].Lanes[1], args[0].Lanes[2])
+		default:
+			return builtinPerlin1(args[0].Lanes[0])
+		}
 	}
-	out := make([]float64, len(args))
-	for idx, arg := range args {
-		out[idx] = arg.scalar()
+	switch len(args) {
+	case 1:
+		return builtinPerlin1(args[0].scalar())
+	case 2:
+		return builtinPerlin2(args[0].scalar(), args[1].scalar())
+	case 3:
+		return builtinPerlin3(args[0].scalar(), args[1].scalar(), args[2].scalar())
+	default:
+		return 0
 	}
-	return out
+}
+
+func evalVoronoiBuiltin(args []value) float64 {
+	if len(args) == 1 && args[0].Typ.IsVector() {
+		switch args[0].Typ {
+		case ir.TypeVec2:
+			return builtinVoronoi2(args[0].Lanes[0], args[0].Lanes[1])
+		case ir.TypeVec3:
+			return builtinVoronoi3(args[0].Lanes[0], args[0].Lanes[1], args[0].Lanes[2])
+		default:
+			return 0
+		}
+	}
+	switch len(args) {
+	case 2:
+		return builtinVoronoi2(args[0].scalar(), args[1].scalar())
+	case 3:
+		return builtinVoronoi3(args[0].scalar(), args[1].scalar(), args[2].scalar())
+	default:
+		return 0
+	}
+}
+
+func evalVoronoiBorderBuiltin(args []value) float64 {
+	if len(args) == 1 && args[0].Typ == ir.TypeVec3 {
+		return builtinVoronoiBorder3(args[0].Lanes[0], args[0].Lanes[1], args[0].Lanes[2])
+	}
+	if len(args) == 3 {
+		return builtinVoronoiBorder3(args[0].scalar(), args[1].scalar(), args[2].scalar())
+	}
+	return 0
+}
+
+func evalWorleyBuiltin(args []value) float64 {
+	if len(args) == 1 && args[0].Typ.IsVector() {
+		switch args[0].Typ {
+		case ir.TypeVec2:
+			return builtinWorley2(args[0].Lanes[0], args[0].Lanes[1])
+		case ir.TypeVec3:
+			return builtinWorley3(args[0].Lanes[0], args[0].Lanes[1], args[0].Lanes[2])
+		case ir.TypeVec4:
+			return builtinWorley4(args[0].Lanes[0], args[0].Lanes[1], args[0].Lanes[2], args[0].Lanes[3])
+		default:
+			return 0
+		}
+	}
+	switch len(args) {
+	case 2:
+		return builtinWorley2(args[0].scalar(), args[1].scalar())
+	case 3:
+		return builtinWorley3(args[0].scalar(), args[1].scalar(), args[2].scalar())
+	case 4:
+		return builtinWorley4(args[0].scalar(), args[1].scalar(), args[2].scalar(), args[3].scalar())
+	default:
+		return 0
+	}
 }
