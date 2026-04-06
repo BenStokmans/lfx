@@ -4,8 +4,8 @@ import "fmt"
 
 // LexError represents a lexical analysis error with position information.
 type LexError struct {
-	Msg  string
-	Pos  Pos
+	Msg string
+	Pos Pos
 }
 
 func (e *LexError) Error() string {
@@ -32,11 +32,10 @@ func NewLexer(input string) *Lexer {
 	}
 }
 
-// next consumes and returns the current character, advancing position tracking.
-// Returns 0 if at end of input.
-func (l *Lexer) next() byte {
+// next consumes the current character, advancing position tracking.
+func (l *Lexer) next() {
 	if l.pos >= len(l.input) {
-		return 0
+		return
 	}
 	ch := l.input[l.pos]
 	l.pos++
@@ -46,7 +45,6 @@ func (l *Lexer) next() byte {
 	} else {
 		l.col++
 	}
-	return ch
 }
 
 // peek returns the current character without consuming it.

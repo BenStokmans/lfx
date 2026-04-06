@@ -78,9 +78,12 @@ export function fb(x)
   return la.fa(x)
 end
 `
+	//nolint:gosec
 	if err := os.WriteFile(libAPath, []byte(libASrc), 0o644); err != nil {
 		t.Fatalf("write lib_a: %v", err)
 	}
+
+	//nolint:gosec
 	if err := os.WriteFile(libBPath, []byte(libBSrc), 0o644); err != nil {
 		t.Fatalf("write lib_b: %v", err)
 	}
@@ -94,6 +97,7 @@ function sample(width, height, x, y, index, phase, params)
   return la.fa(phase)
 end
 `
+	//nolint:gosec
 	if err := os.WriteFile(effectPath, []byte(effectSrc), 0o644); err != nil {
 		t.Fatalf("write effect: %v", err)
 	}

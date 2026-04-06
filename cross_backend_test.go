@@ -95,6 +95,7 @@ func TestRGBAndRGBWEffectsCompileAcrossBackends(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			effectsDir := filepath.Join(root, "effects")
+			//nolint:gosec
 			if err := os.MkdirAll(effectsDir, 0o755); err != nil {
 				t.Fatalf("create effects dir: %v", err)
 			}
@@ -106,6 +107,7 @@ function sample(width, height, x, y, index, phase, params)
   ` + tc.returns + `
 end
 `
+			//nolint:gosec
 			if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
 				t.Fatalf("write effect: %v", err)
 			}

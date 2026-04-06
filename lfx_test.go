@@ -32,7 +32,9 @@ func TestEngineLoadFileCPU(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	defer engine.Close()
+	defer func() {
+		_ = engine.Close()
+	}()
 
 	if engine.OutputChannels() != 1 {
 		t.Fatalf("OutputChannels = %d, want 1", engine.OutputChannels())
@@ -50,7 +52,9 @@ func TestEngineParamsReturnedForBind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	defer engine.Close()
+	defer func() {
+		_ = engine.Close()
+	}()
 
 	specs := engine.Params()
 	if len(specs) == 0 {
@@ -76,7 +80,9 @@ func TestEngineSamplePointInRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	defer engine.Close()
+	defer func() {
+		_ = engine.Close()
+	}()
 
 	params, err := runtime.Bind(engine.Params(), nil)
 	if err != nil {
@@ -109,7 +115,9 @@ func TestEngineSamplePointsMatchesSamplePoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFile: %v", err)
 	}
-	defer engine.Close()
+	defer func() {
+		_ = engine.Close()
+	}()
 
 	params, err := runtime.Bind(engine.Params(), nil)
 	if err != nil {
@@ -161,7 +169,7 @@ func TestEngineEffectsAllBackendsCPU(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LoadFile: %v", err)
 			}
-			defer engine.Close()
+			defer engine.Close() //nolint:errcheck
 
 			params, err := runtime.Bind(engine.Params(), nil)
 			if err != nil {

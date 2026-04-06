@@ -57,11 +57,6 @@ func (p *Parser) current() Token {
 	return p.tokens[p.pos]
 }
 
-// peek returns the current token without advancing (after skipping comments).
-func (p *Parser) peek() Token {
-	return p.current()
-}
-
 // advance consumes the current token and returns it.
 func (p *Parser) advance() Token {
 	tok := p.current()
@@ -631,16 +626,6 @@ func (p *Parser) parseIdentLedStmt() (Stmt, error) {
 	}
 
 	return &LocalStmt{Pos: nameTok.Pos, Names: names, Values: values}, nil
-}
-
-func (p *Parser) parseAssignStmt() (Stmt, error) {
-	nameTok := p.advance() // consume ident
-	p.advance()            // consume '='
-	expr, err := p.parseExpr()
-	if err != nil {
-		return nil, err
-	}
-	return &AssignStmt{Pos: nameTok.Pos, Name: nameTok.Literal, Value: expr}, nil
 }
 
 func (p *Parser) parseIfStmt() (Stmt, error) {

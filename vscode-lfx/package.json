@@ -1,0 +1,168 @@
+{
+  "name": "lfx-language-support",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BenStokmans/lfx"
+  },
+  "displayName": "LFX Language Support",
+  "description": "LFX Language Support adds first-class editing support for `.lfx` files in Visual Studio Code.",
+  "version": "0.1.0",
+  "publisher": "BenStokmans",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "lfx",
+    "wgsl",
+    "lighting",
+    "dsl"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "build": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc -p ./ --noEmit",
+    "test": "npm run compile && node --test out/test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/vscode": "1.96.0",
+    "typescript": "^6.0.2"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "lfx",
+        "aliases": [
+          "LFX",
+          "lfx"
+        ],
+        "extensions": [
+          ".lfx"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./media/lfx-file-icon.svg",
+          "dark": "./media/lfx-file-icon.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lfx",
+        "scopeName": "source.lfx",
+        "path": "./syntaxes/lfx.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "lfx",
+        "path": "./snippets/lfx.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "lfx.checkCurrentFile",
+        "title": "LFX: Check Current File",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.checkWorkspace",
+        "title": "LFX: Check Workspace",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.showGeneratedWgsl",
+        "title": "LFX: Show Generated WGSL",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.openModuleGraph",
+        "title": "LFX: Open Module Graph",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.webgpuProbe",
+        "title": "LFX: WebGPU Probe",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.openLivePreview",
+        "title": "LFX: Open Live Preview",
+        "category": "LFX"
+      },
+      {
+        "command": "lfx.refreshLivePreview",
+        "title": "LFX: Refresh Live Preview",
+        "category": "LFX"
+      }
+    ],
+    "configuration": {
+      "title": "LFX",
+      "properties": {
+        "lfx.path": {
+          "type": "string",
+          "default": "lfx",
+          "description": "Path to the LFX executable."
+        },
+        "lfx.check.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the LFX checker when an .lfx file is saved."
+        },
+        "lfx.check.onType": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run the LFX checker after document changes using a debounce."
+        },
+        "lfx.check.debounceMs": {
+          "type": "number",
+          "default": 400,
+          "minimum": 50,
+          "description": "Debounce delay in milliseconds before on-type diagnostics run."
+        },
+        "lfx.moduleRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional module root directories passed to the LFX CLI as --module-root entries."
+        },
+        "lfx.trace.diagnostics": {
+          "type": "boolean",
+          "default": false,
+          "description": "Emit LFX extension diagnostics and CLI tracing to the output channel."
+        },
+        "lfx.preview.enableOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the live preview when the active .lfx file is saved."
+        },
+        "lfx.preview.trackActiveEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a live preview panel is already open, retarget it when switching to another .lfx editor."
+        },
+        "lfx.preview.preferredLayout": {
+          "type": "string",
+          "default": "grid-32x32",
+          "description": "Default built-in layout used by the live preview panel."
+        },
+        "lfx.preview.trace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Emit preview protocol and runtime tracing to the output channel."
+        }
+      }
+    }
+  }
+}

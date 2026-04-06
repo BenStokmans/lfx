@@ -119,6 +119,7 @@ func BenchmarkEvaluatorSamplePoints(b *testing.B) {
 	}
 }
 
+//nolint:unparam // keep signature for future benchmark variants
 func makeGridLayout(width, height int) runtime.Layout {
 	points := make([]runtime.Point, 0, width*height)
 	index := uint32(0)

@@ -174,12 +174,12 @@ func writeTempEffect(t *testing.T, name, source string) (string, string) {
 	t.Helper()
 
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "effects"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "effects"), 0o750); err != nil {
 		t.Fatalf("create effects dir: %v", err)
 	}
 
 	filePath := filepath.Join(root, "effects", name+".lfx")
-	if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+	if err := os.WriteFile(filePath, []byte(source), 0o600); err != nil {
 		t.Fatalf("write effect file: %v", err)
 	}
 

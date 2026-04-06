@@ -45,7 +45,7 @@ func TestLowerFillIrisCompilesWithoutRemovedStdHelpers(t *testing.T) {
 func TestCompileFileRejectsUnsupportedMultiAssignment(t *testing.T) {
 	root := t.TempDir()
 	effectsDir := filepath.Join(root, "effects")
-	if err := os.MkdirAll(effectsDir, 0o755); err != nil {
+	if err := os.MkdirAll(effectsDir, 0o750); err != nil {
 		t.Fatalf("create effects dir: %v", err)
 	}
 
@@ -58,7 +58,7 @@ function sample(width, height, x, y, index, phase, params)
   return a
 end
 `
-	if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+	if err := os.WriteFile(filePath, []byte(source), 0o600); err != nil {
 		t.Fatalf("write effect file: %v", err)
 	}
 

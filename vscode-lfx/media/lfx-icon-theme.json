@@ -1,0 +1,18 @@
+{
+  "$schema": "vscode://schemas/icon-theme",
+  "fonts": [],
+  "iconDefinitions": {
+    "file-lfx": {
+      "fontCharacter": "\uE001"
+    }
+  },
+  "fileExtensions": {
+    "lfx": "file-lfx"
+  },
+  "definitions": {
+    "file-lfx": {
+      "iconPath": "./lfx-file-icon.svg"
+    }
+  }
+}
+

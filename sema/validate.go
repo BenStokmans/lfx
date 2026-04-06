@@ -8,9 +8,10 @@ import (
 
 // Error is a semantic analysis error with a stable error code.
 type Error struct {
-	Msg  string
-	Pos  parser.Pos
-	Code string // stable error code, e.g. "E001"
+	Msg    string
+	Pos    parser.Pos
+	Length int
+	Code   string // stable error code, e.g. "E001"
 }
 
 // Error implements the error interface.
@@ -20,9 +21,10 @@ func (e *Error) Error() string {
 
 // Warning is a non-fatal semantic diagnostic.
 type Warning struct {
-	Msg  string
-	Pos  parser.Pos
-	Code string // stable warning code, e.g. "W001"
+	Msg    string
+	Pos    parser.Pos
+	Length int
+	Code   string // stable warning code, e.g. "W001"
 }
 
 // analyzer holds the state for a single analysis pass.
@@ -66,8 +68,16 @@ func (a *analyzer) addError(pos parser.Pos, code, msg string) {
 	a.errors = append(a.errors, Error{Pos: pos, Code: code, Msg: msg})
 }
 
+func (a *analyzer) addErrorLen(pos parser.Pos, length int, code, msg string) {
+	a.errors = append(a.errors, Error{Pos: pos, Length: length, Code: code, Msg: msg})
+}
+
 func (a *analyzer) addWarning(pos parser.Pos, code, msg string) {
 	a.warnings = append(a.warnings, Warning{Pos: pos, Code: code, Msg: msg})
+}
+
+func (a *analyzer) addWarningLen(pos parser.Pos, length int, code, msg string) {
+	a.warnings = append(a.warnings, Warning{Pos: pos, Length: length, Code: code, Msg: msg})
 }
 
 // Analyze performs full semantic analysis on a parsed module.
@@ -151,6 +161,8 @@ func (a *analyzer) checkModuleConstraints() {
 	}
 }
 
+const sampleFuncName = "sample"
+
 func (a *analyzer) checkEffectConstraints() {
 	// Effect modules must have exactly one "sample" function.
 	var sampleFn *parser.FuncDecl
@@ -162,7 +174,7 @@ func (a *analyzer) checkEffectConstraints() {
 		a.addError(pos, ErrEffectMissingOutput, "effect modules must declare an output type")
 	}
 	for _, fn := range a.mod.Funcs {
-		if fn.Name == "sample" {
+		if fn.Name == sampleFuncName {
 			sampleFn = fn
 		}
 		if fn.Exported {
@@ -181,7 +193,7 @@ func (a *analyzer) checkEffectConstraints() {
 func (a *analyzer) checkLibraryConstraints() {
 	// Library modules must not have a sample function.
 	for _, fn := range a.mod.Funcs {
-		if fn.Name == "sample" {
+		if fn.Name == sampleFuncName {
 			a.addError(fn.Pos, ErrLibraryHasSample, "library modules must not have a \"sample\" function")
 		}
 	}

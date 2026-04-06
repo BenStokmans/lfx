@@ -71,6 +71,7 @@ func (d *Diagnostics) Error() string {
 
 // ParseFile parses an entry source file into an AST.
 func ParseFile(filePath string) (*parser.Module, []byte, error) {
+	//nolint:gosec // filePath is provided by the caller and resolved by CLI/host app
 	source, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading %s: %w", filePath, err)

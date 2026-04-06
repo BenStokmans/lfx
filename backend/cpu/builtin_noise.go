@@ -28,6 +28,7 @@ type voronoiResult struct {
 	edge     float64
 }
 
+//nolint:unused // kept for parity with WGSL builtin dispatch
 func builtinPerlin(args []float64) float64 {
 	switch len(args) {
 	case 1:
@@ -41,6 +42,7 @@ func builtinPerlin(args []float64) float64 {
 	}
 }
 
+//nolint:unused // kept for parity with WGSL builtin dispatch
 func builtinVoronoi(args []float64) float64 {
 	switch len(args) {
 	case 2:
@@ -52,6 +54,7 @@ func builtinVoronoi(args []float64) float64 {
 	}
 }
 
+//nolint:unused // kept for parity with WGSL builtin dispatch
 func builtinVoronoiBorder(args []float64) float64 {
 	if len(args) != 3 {
 		return 0
@@ -59,6 +62,7 @@ func builtinVoronoiBorder(args []float64) float64 {
 	return builtinVoronoiBorder3(args[0], args[1], args[2])
 }
 
+//nolint:unused // kept for parity with WGSL builtin dispatch
 func builtinWorley(args []float64) float64 {
 	if len(args) < 2 || len(args) > 4 {
 		return 0
@@ -379,6 +383,7 @@ func worleyDistance(at [4]float64) float64 {
 }
 
 func addWorleySamples(xi, yi, zi, wi int32, at [4]float64, best *float64) {
+	//nolint:gosec // intentional wrap-around hashing for Worley noise seeds
 	seed := 702395077*uint32(xi) + 915488749*uint32(yi) + 2120969693*uint32(zi) + 1234567891*uint32(wi)
 	count := worleyPoissonCount[seed>>24]
 	seed = 1402024253*seed + 586950981

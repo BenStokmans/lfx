@@ -29,7 +29,13 @@ func ValidateLayout(layout Layout) error {
 		return fmt.Errorf("layout must contain at least one point")
 	}
 
+	maxUint32 := int(^uint32(0))
+	if len(layout.Points) > maxUint32 {
+		return fmt.Errorf("layout has too many points (%d)", len(layout.Points))
+	}
+
 	seen := make(map[uint32]struct{}, len(layout.Points))
+	//nolint:gosec // bounded by maxUint32 check above
 	maxIndex := uint32(len(layout.Points) - 1)
 	for i, pt := range layout.Points {
 		if _, ok := seen[pt.Index]; ok {

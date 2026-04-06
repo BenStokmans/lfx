@@ -26,10 +26,12 @@ func compileEffect(t *testing.T, source string) *compiler.Result {
 	t.Helper()
 	root := t.TempDir()
 	effectsDir := filepath.Join(root, "effects")
+	//nolint:gosec
 	if err := os.MkdirAll(effectsDir, 0o755); err != nil {
 		t.Fatalf("mkdir effects: %v", err)
 	}
 	path := filepath.Join(effectsDir, "parity.lfx")
+	//nolint:gosec
 	if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
 		t.Fatalf("write effect: %v", err)
 	}
@@ -262,6 +264,7 @@ end
 	}
 	ev := cpu.NewEvaluator(result.IR)
 
+	//nolint:gosec // deterministic RNG for test coverage
 	r := rand.New(rand.NewSource(42))
 	for range 20 {
 		pointIdx := r.Intn(len(layout.Points))

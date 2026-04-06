@@ -62,12 +62,13 @@ func (e *Emitter) emitStmt(stmt ir.IRStmt) {
 		e.writeln("}")
 
 	case *ir.Return:
-		if len(s.Values) == 0 {
+		switch len(s.Values) {
+		case 0:
 			e.writeln("return;")
-		} else if len(s.Values) == 1 {
+		case 1:
 			val := e.emitExpr(s.Values[0])
 			e.writef("return %s;\n", val)
-		} else {
+		default:
 			values := make([]string, 0, len(s.Values))
 			for _, value := range s.Values {
 				values = append(values, e.emitExpr(value))

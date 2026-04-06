@@ -14,6 +14,16 @@ import (
 	"github.com/BenStokmans/lfx/stdlib"
 )
 
+func mustUint32(t *testing.T, value int) uint32 {
+	t.Helper()
+	maxUint32 := int(^uint32(0))
+	if value < 0 || value > maxUint32 {
+		t.Fatalf("value %d does not fit in uint32", value)
+	}
+	//nolint:gosec // guarded by bounds check above
+	return uint32(value)
+}
+
 func TestFillIrisSamplingIsSymmetric(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	result, err := compiler.CompileFile(filepath.Join(root, "effects", "fill_iris.lfx"), compiler.Options{
@@ -86,6 +96,7 @@ function sample(width, height, x, y, index, phase, params)
 			source += `
 end
 `
+			//nolint:gosec
 			if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
 				t.Fatalf("write effect: %v", err)
 			}
@@ -136,6 +147,7 @@ function sample(width, height, x, y, index, phase, params)
   return ` + tc.ret + `
 end
 `
+			//nolint:gosec
 			if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
 				t.Fatalf("write effect: %v", err)
 			}
@@ -184,7 +196,7 @@ func TestEvaluatorSamplePointsMatchesScalarForChromaBloom(t *testing.T) {
 	for y := 0; y < 8; y++ {
 		for x := 0; x < 8; x++ {
 			layout.Points = append(layout.Points, runtime.Point{
-				Index: uint32(len(layout.Points)),
+				Index: mustUint32(t, len(layout.Points)),
 				X:     float32(x),
 				Y:     float32(y),
 			})
@@ -289,7 +301,7 @@ func TestEvaluatorSamplePointsMatchesScalarForPerlin501(t *testing.T) {
 	for y := 0; y < 8; y++ {
 		for x := 0; x < 8; x++ {
 			layout.Points = append(layout.Points, runtime.Point{
-				Index: uint32(len(layout.Points)),
+				Index: mustUint32(t, len(layout.Points)),
 				X:     float32(x),
 				Y:     float32(y),
 			})
@@ -384,6 +396,7 @@ func makeGridTestLayout(width, height int) runtime.Layout {
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			points = append(points, runtime.Point{
+				//nolint:gosec
 				Index: uint32(len(points)),
 				X:     float32(x),
 				Y:     float32(y),

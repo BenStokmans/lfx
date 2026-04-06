@@ -37,7 +37,7 @@ func (s *Store) Get(key Key) ([]byte, bool, error) {
 // Put stores a cache payload atomically.
 func (s *Store) Put(key Key, payload []byte) error {
 	path := s.Path(key)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), "lfx-cache-*")
@@ -45,7 +45,9 @@ func (s *Store) Put(key Key, payload []byte) error {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
 
 	if _, err := tmp.Write(payload); err != nil {
 		_ = tmp.Close()
@@ -61,7 +63,7 @@ func (s *Store) Put(key Key, payload []byte) error {
 func (s *Store) PutJSON(key Key, value any) error {
 	payload, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("marshalling cache payload: %w", err)
+		return fmt.Errorf("marshaling cache payload: %w", err)
 	}
 	return s.Put(key, payload)
 }

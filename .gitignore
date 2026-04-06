@@ -1,5 +1,9 @@
 build/bin
 node_modules
 frontend/dist
-preview/frontend/dist
-preview/build/bin
+lfx-preview/frontend/dist
+lfx-preview/build/bin
+vscode-lfx/node_modules
+vscode-lfx/out
+vscode-lfx/*.vsix
+vscode-lfx/bin/*

@@ -6,6 +6,8 @@ import (
 	"github.com/BenStokmans/lfx/ir"
 )
 
+const wgslZeroLiteral = "0.0"
+
 // emitBuiltinCall maps a builtin ID and pre-emitted argument strings to a WGSL expression.
 func (e *Emitter) emitBuiltinCall(call *ir.BuiltinCall, args []string) string {
 	switch call.Builtin {
@@ -86,7 +88,7 @@ func (e *Emitter) emitBuiltinCall(call *ir.BuiltinCall, args []string) string {
 		case 3:
 			return fmt.Sprintf("lfx_perlin3(vec3<f32>(%s, %s, %s))", args[0], args[1], args[2])
 		default:
-			return "0.0"
+			return wgslZeroLiteral
 		}
 	case ir.BuiltinVoronoi:
 		switch len(args) {
@@ -97,7 +99,7 @@ func (e *Emitter) emitBuiltinCall(call *ir.BuiltinCall, args []string) string {
 		case 3:
 			return fmt.Sprintf("lfx_voronoi3(vec3<f32>(%s, %s, %s))", args[0], args[1], args[2])
 		default:
-			return "0.0"
+			return wgslZeroLiteral
 		}
 	case ir.BuiltinVoronoiBorder:
 		if len(args) == 1 && call.Args[0].ResultType().Lanes() == 3 {
@@ -106,7 +108,7 @@ func (e *Emitter) emitBuiltinCall(call *ir.BuiltinCall, args []string) string {
 		if len(args) == 3 {
 			return fmt.Sprintf("lfx_voronoi_border3(vec3<f32>(%s, %s, %s))", args[0], args[1], args[2])
 		}
-		return "0.0"
+		return wgslZeroLiteral
 	case ir.BuiltinWorley:
 		switch len(args) {
 		case 1:
@@ -118,7 +120,7 @@ func (e *Emitter) emitBuiltinCall(call *ir.BuiltinCall, args []string) string {
 		case 4:
 			return fmt.Sprintf("lfx_worley4(vec4<f32>(%s, %s, %s, %s))", args[0], args[1], args[2], args[3])
 		default:
-			return "0.0"
+			return wgslZeroLiteral
 		}
 	default:
 		return fmt.Sprintf("/* unknown builtin %d */", int(call.Builtin))

@@ -11,6 +11,7 @@ import (
 
 func TestParseFillIrisExample(t *testing.T) {
 	sourcePath := filepath.Join("..", "effects", "fill_iris.lfx")
+	//nolint:gosec // reading test fixture from repo
 	source, err := os.ReadFile(sourcePath)
 	if err != nil {
 		t.Fatalf("read source: %v", err)

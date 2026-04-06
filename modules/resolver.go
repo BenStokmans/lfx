@@ -32,6 +32,7 @@ func (r *FileResolver) Resolve(path string) ([]byte, error) {
 	}
 	for _, root := range r.Roots {
 		for _, full := range candidatePaths(root, normalized) {
+			//nolint:gosec // resolved from configured roots + normalized module path
 			data, err := os.ReadFile(full)
 			if err == nil {
 				return data, nil

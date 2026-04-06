@@ -115,9 +115,9 @@ func buildBatchArgs(layout runtime.Layout, pointIndices []int, phase float32) []
 	return []batchValue{
 		filledBatchScalar(ir.TypeF32, count, float64(layout.Width)),
 		filledBatchScalar(ir.TypeF32, count, float64(layout.Height)),
-		scalarBatchValue(ir.TypeF32, xs),
-		scalarBatchValue(ir.TypeF32, ys),
-		scalarBatchValue(ir.TypeF32, indices),
+		scalarBatchValue(xs),
+		scalarBatchValue(ys),
+		scalarBatchValue(indices),
 		filledBatchScalar(ir.TypeF32, count, float64(phase)),
 		filledBatchScalar(ir.TypeF32, count, 0),
 	}
@@ -443,16 +443,16 @@ func callBuiltinBatch(id ir.BuiltinID, args []batchValue) (batchValue, error) {
 		}
 		return out, nil
 	case ir.BuiltinDot:
-		return scalarBatchValue(ir.TypeF32, dotBatchValue(args[0], args[1])), nil
+		return scalarBatchValue(dotBatchValue(args[0], args[1])), nil
 	case ir.BuiltinLength:
 		if args[0].Typ.IsVector() {
-			return scalarBatchValue(ir.TypeF32, vectorLenBatch(args[0])), nil
+			return scalarBatchValue(vectorLenBatch(args[0])), nil
 		}
 		return applyLiftedBatchBuiltin(args[0], math.Abs), nil
 	case ir.BuiltinDistance:
 		diff := evalBinaryBatchValue(ir.OpSub, args[0].Typ, args[0], args[1])
 		if diff.Typ.IsVector() {
-			return scalarBatchValue(ir.TypeF32, vectorLenBatch(diff)), nil
+			return scalarBatchValue(vectorLenBatch(diff)), nil
 		}
 		return applyLiftedBatchBuiltin(diff, math.Abs), nil
 	case ir.BuiltinNormalize:
@@ -474,22 +474,22 @@ func callBuiltinBatch(id ir.BuiltinID, args []batchValue) (batchValue, error) {
 				scale[idx] = dotBatchValueAt(args[0], args[1], idx) / value
 			}
 		}
-		return evalBinaryBatchValue(ir.OpMul, args[1].Typ, args[1], scalarBatchValue(ir.TypeF32, scale)), nil
+		return evalBinaryBatchValue(ir.OpMul, args[1].Typ, args[1], scalarBatchValue(scale)), nil
 	case ir.BuiltinReflect:
 		scale := make([]float64, args[0].count())
 		for idx := range scale {
 			scale[idx] = 2 * dotBatchValueAt(args[1], args[0], idx)
 		}
-		projected := evalBinaryBatchValue(ir.OpMul, args[1].Typ, args[1], scalarBatchValue(ir.TypeF32, scale))
+		projected := evalBinaryBatchValue(ir.OpMul, args[1].Typ, args[1], scalarBatchValue(scale))
 		return evalBinaryBatchValue(ir.OpSub, args[0].Typ, args[0], projected), nil
 	case ir.BuiltinPerlin:
-		return scalarBatchValue(ir.TypeF32, evalPerlinBuiltinBatch(args)), nil
+		return scalarBatchValue(evalPerlinBuiltinBatch(args)), nil
 	case ir.BuiltinVoronoi:
-		return scalarBatchValue(ir.TypeF32, evalVoronoiBuiltinBatch(args)), nil
+		return scalarBatchValue(evalVoronoiBuiltinBatch(args)), nil
 	case ir.BuiltinVoronoiBorder:
-		return scalarBatchValue(ir.TypeF32, evalVoronoiBorderBuiltinBatch(args)), nil
+		return scalarBatchValue(evalVoronoiBorderBuiltinBatch(args)), nil
 	case ir.BuiltinWorley:
-		return scalarBatchValue(ir.TypeF32, evalWorleyBuiltinBatch(args)), nil
+		return scalarBatchValue(evalWorleyBuiltinBatch(args)), nil
 	default:
 		return batchValue{}, &batchUnsupportedError{reason: fmt.Sprintf("batched evaluator does not support builtin %v", id)}
 	}
@@ -507,12 +507,9 @@ func zeroBatchValue(typ ir.Type, count int) batchValue {
 	return out
 }
 
-func scalarBatchValue(typ ir.Type, values []float64) batchValue {
-	if typ == ir.TypeUnknown || typ.IsVector() || typ == ir.TypeVoid {
-		typ = ir.TypeF32
-	}
+func scalarBatchValue(values []float64) batchValue {
 	return batchValue{
-		Typ:   typ,
+		Typ:   ir.TypeF32,
 		Lanes: [4][]float64{cloneLane(values)},
 	}
 }

@@ -22,6 +22,7 @@ type PreviewDiagnostic struct {
 	ModulePath string `json:"modulePath,omitempty"`
 	Line       int    `json:"line,omitempty"`
 	Column     int    `json:"column,omitempty"`
+	Length     int    `json:"length,omitempty"`
 }
 
 // PreviewArtifact is the full compile output used by the preview app.
@@ -150,6 +151,7 @@ func DiagnosticsFromError(filePath, modulePath string, err error) []PreviewDiagn
 			ModulePath: modulePath,
 			Line:       semaErr.Pos.Line,
 			Column:     semaErr.Pos.Col,
+			Length:     semaErr.Length,
 		}}
 	}
 
@@ -175,6 +177,7 @@ func DiagnosticsFromWarnings(filePath, modulePath string, warnings []sema.Warnin
 			ModulePath: modulePath,
 			Line:       warning.Pos.Line,
 			Column:     warning.Pos.Col,
+			Length:     warning.Length,
 		})
 	}
 	return diags

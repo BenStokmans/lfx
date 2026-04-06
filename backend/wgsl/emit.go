@@ -64,16 +64,12 @@ func Emit(mod *ir.Module) (string, error) {
 		if fn == mod.Sample || !e.reachable[fn] {
 			continue
 		}
-		if err := e.emitFunction(fn); err != nil {
-			return "", fmt.Errorf("emitting function %s: %w", fn.Name, err)
-		}
+		e.emitFunction(fn)
 	}
 
 	// Emit sample function.
 	if mod.Sample != nil {
-		if err := e.emitSampleFunction(mod.Sample); err != nil {
-			return "", fmt.Errorf("emitting sample function: %w", err)
-		}
+		e.emitSampleFunction(mod.Sample)
 	}
 
 	// Emit compute entry point.
@@ -223,7 +219,7 @@ func (e *Emitter) markReachableExpr(expr ir.IRExpr, byName map[string]*ir.Functi
 	}
 }
 
-func (e *Emitter) emitSampleFunction(fn *ir.Function) error {
+func (e *Emitter) emitSampleFunction(fn *ir.Function) {
 	// Emit sample with a dummy params slot so source-level helper calls can pass
 	// `params` through even though `params.name` lowers directly to uniforms.
 	e.writef("fn lfx_sample(width: f32, height: f32, x: f32, y: f32, index: f32, phase: f32, params: f32) -> %s {\n", sampleReturnType(e.mod.Output))
@@ -244,13 +240,12 @@ func (e *Emitter) emitSampleFunction(fn *ir.Function) error {
 	e.indent--
 	e.writeln("}")
 	e.writeln("")
-	return nil
 }
 
-func (e *Emitter) emitFunction(fn *ir.Function) error {
+func (e *Emitter) emitFunction(fn *ir.Function) {
 	e.currentFunc = fn
 
-	retType := "f32"
+	var retType string
 	if fn.MultiRet > 1 {
 		retType = multiRetStructName(fn.Name, fn.MultiRet)
 	} else {
@@ -258,7 +253,7 @@ func (e *Emitter) emitFunction(fn *ir.Function) error {
 	}
 
 	// Build parameter list.
-	var params []string
+	params := make([]string, 0, len(fn.Params))
 	for _, p := range fn.Params {
 		params = append(params, fmt.Sprintf("%s: %s", sanitizeName(p.Name), wgslType(p.Type)))
 	}
@@ -279,7 +274,6 @@ func (e *Emitter) emitFunction(fn *ir.Function) error {
 	e.indent--
 	e.writeln("}")
 	e.writeln("")
-	return nil
 }
 
 func (e *Emitter) emitEntryPoint() {
@@ -446,7 +440,7 @@ func zeroLiteral(typ ir.Type) string {
 	case ir.TypeVec4:
 		return "vec4<f32>(0.0, 0.0, 0.0, 0.0)"
 	default:
-		return "0.0"
+		return wgslZeroLiteral
 	}
 }
 

@@ -24,7 +24,7 @@ function sample(width, height, x, y, index, phase, params)
   return phase
 end
 `
-	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
 		t.Fatalf("write effect: %v", err)
 	}
 	result, err := compiler.CompileFile(path, compiler.Options{BaseDir: root})

@@ -16,7 +16,7 @@ func (e *Evaluator) callBuiltin(id ir.BuiltinID, args []value) (value, error) {
 	case ir.BuiltinVec4:
 		return vectorValue(ir.TypeVec4, args[0].scalar(), args[1].scalar(), args[2].scalar(), args[3].scalar()), nil
 	case ir.BuiltinAbs:
-		return applyLiftedBuiltin(args, func(x float64) float64 { return math.Abs(x) }), nil
+		return applyLiftedBuiltin(args, math.Abs), nil
 	case ir.BuiltinFloor:
 		return applyLiftedBuiltin(args, math.Floor), nil
 	case ir.BuiltinCeil:

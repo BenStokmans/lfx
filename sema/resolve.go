@@ -20,7 +20,7 @@ func (a *analyzer) resolveFunc(fn *parser.FuncDecl) {
 		})
 	}
 
-	// Initialise call-graph entry for this function.
+	// Initialize call-graph entry for this function.
 	if a.callGraph[fn.Name] == nil {
 		a.callGraph[fn.Name] = make(map[string]bool)
 	}
@@ -56,7 +56,7 @@ func (a *analyzer) resolveStmt(stmt parser.Stmt, scope *Scope, currentFunc strin
 		a.resolveExpr(s.Value, scope, currentFunc)
 		if sym == nil || sym.Kind == SymBuiltin {
 			if sym != nil && sym.Kind == SymBuiltin {
-				a.addWarning(s.Pos, WarnBuiltinShadowed, fmt.Sprintf("local %q shadows builtin %q", s.Name, s.Name))
+				a.addWarningLen(s.Pos, len(s.Name), WarnBuiltinShadowed, fmt.Sprintf("local %q shadows builtin %q", s.Name, s.Name))
 			}
 			_ = scope.Define(s.Name, &Symbol{
 				Name: s.Name,

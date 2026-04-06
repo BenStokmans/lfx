@@ -61,7 +61,7 @@ return x, y`,
 				t.Fatalf("parser panicked on input: %v", r)
 			}
 		}()
-		parser.Parse(source) //nolint:errcheck
+		parser.Parse(source) //nolint:errcheck,gosec
 	})
 }
 
@@ -89,7 +89,7 @@ end
 		r := fuzzMapResolver{
 			"dep": []byte(depSource),
 		}
-		modules.Build("entry", []byte(entrySource), r) //nolint:errcheck
+		modules.Build("entry", []byte(entrySource), r) //nolint:errcheck,gosec
 	})
 }
 
@@ -145,7 +145,7 @@ end
 			Points: []runtime.Point{{Index: 0, X: 1, Y: 1}},
 		}
 		params, _ := runtime.Bind(irmod.Params, nil)
-		ev.SamplePoint(layout, 0, 0.5, params) //nolint:errcheck
+		ev.SamplePoint(layout, 0, 0.5, params) //nolint:errcheck,gosec
 	})
 }
 
@@ -207,7 +207,7 @@ end
 			Points: []runtime.Point{{Index: 0, X: 1, Y: 1}},
 		}
 		params, _ := runtime.Bind(irmod.Params, nil)
-		ev.SamplePoint(layout, 0, 0.5, params) //nolint:errcheck
+		ev.SamplePoint(layout, 0, 0.5, params) //nolint:errcheck,gosec
 	})
 }
 
@@ -240,7 +240,8 @@ func FuzzRuntimeBind(f *testing.F) {
 
 		// Provide the fuzz string as the override value — Bind should reject
 		// type mismatches without panicking.
-		runtime.Bind(specs, map[string]any{name: valueStr}) //nolint:errcheck
+		//nolint:errcheck,gosec
+		runtime.Bind(specs, map[string]any{name: valueStr})
 	})
 }
 
@@ -295,7 +296,9 @@ end
 			return
 		}
 		lower.ConstFold(irmod)
-		wgsl.Emit(irmod) //nolint:errcheck
+
+		//nolint:errcheck,gosec
+		wgsl.Emit(irmod)
 	})
 }
 
@@ -359,13 +362,14 @@ func FuzzCPUDeterminism(f *testing.F) {
 // ── Property test: random corpus — parser never panics ───────────────────────
 
 func TestParserNeverPanicsOnRandomInput(t *testing.T) {
+	//nolint:gosec // deterministic RNG for fuzz corpus
 	r := rand.New(rand.NewSource(12345))
 	const iterations = 500
 	for i := range iterations {
 		size := r.Intn(200)
 		buf := make([]byte, size)
 		for j := range buf {
-			buf[j] = byte(r.Intn(128)) // printable-ish ASCII
+			buf[j] = byte(r.Intn(128)) //nolint:gosec // printable-ish ASCII
 		}
 		func() {
 			defer func() {
@@ -373,7 +377,7 @@ func TestParserNeverPanicsOnRandomInput(t *testing.T) {
 					t.Fatalf("iteration %d: parser panicked on random input: %v", i, rec)
 				}
 			}()
-			parser.Parse(string(buf)) //nolint:errcheck
+			parser.Parse(string(buf)) //nolint:errcheck,gosec
 		}()
 	}
 }
@@ -381,6 +385,7 @@ func TestParserNeverPanicsOnRandomInput(t *testing.T) {
 // ── Property test: sema never panics on structurally valid parsed modules ─────
 
 func TestSemaAnalyzeNeverPanicsOnValidParseResult(t *testing.T) {
+	//nolint:gosec // deterministic RNG for fuzz corpus
 	r := rand.New(rand.NewSource(99999))
 	const iterations = 200
 
@@ -422,6 +427,7 @@ end
 func TestCPUEvaluatorNeverPanicsOnRandomLayouts(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "e.lfx")
+	//nolint:gosec
 	if err := os.WriteFile(path, []byte(`module "effects/e"
 effect "e"
 output scalar
@@ -438,6 +444,7 @@ end
 	params, _ := runtime.Bind(result.IR.Params, nil)
 	ev := cpu.NewEvaluator(result.IR)
 
+	//nolint:gosec // deterministic RNG for fuzz corpus
 	r := rand.New(rand.NewSource(777))
 	const iterations = 200
 	for i := range iterations {
@@ -462,7 +469,7 @@ end
 					t.Fatalf("iteration %d: cpu evaluator panicked: %v", i, rec)
 				}
 			}()
-			ev.SamplePoint(layout, pointIdx, phase, params) //nolint:errcheck
+			ev.SamplePoint(layout, pointIdx, phase, params) //nolint:errcheck,gosec
 		}()
 	}
 }

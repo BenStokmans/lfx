@@ -1,0 +1,70 @@
+{
+  "comments": {
+    "lineComment": "--"
+  },
+  "brackets": [
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ]
+  ],
+  "autoClosingPairs": [
+    {
+      "open": "(",
+      "close": ")"
+    },
+    {
+      "open": "[",
+      "close": "]"
+    },
+    {
+      "open": "{",
+      "close": "}"
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "notIn": [
+        "string",
+        "comment"
+      ]
+    }
+  ],
+  "surroundingPairs": [
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ],
+    [
+      "\"",
+      "\""
+    ]
+  ],
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([A-Za-z_][A-Za-z0-9_]*(?:\\/[A-Za-z_][A-Za-z0-9_]*)*)",
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(?:params|timeline)\\s*\\{|^\\s*(?:export\\s+)?function\\b.*$|^\\s*if\\b.*\\bthen\\s*$|^\\s*elseif\\b.*\\bthen\\s*$|^\\s*else\\s*$",
+    "decreaseIndentPattern": "^\\s*(?:end|elseif\\b.*\\bthen|else)\\b.*$"
+  },
+  "folding": {
+    "markers": {
+      "start": "^\\s*--\\s*#region\\b",
+      "end": "^\\s*--\\s*#endregion\\b"
+    }
+  }
+}

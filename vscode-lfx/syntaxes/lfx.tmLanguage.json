@@ -1,0 +1,191 @@
+{
+  "name": "LFX",
+  "scopeName": "source.lfx",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#moduleDeclaration"
+    },
+    {
+      "include": "#imports"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#functionDeclaration"
+    },
+    {
+      "include": "#paramsBlock"
+    },
+    {
+      "include": "#outputKinds"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#booleans"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#strings"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-dash.lfx",
+          "match": "--.*$"
+        }
+      ]
+    },
+    "moduleDeclaration": {
+      "patterns": [
+        {
+          "name": "meta.module.lfx",
+          "match": "\\b(module|effect|library|version)\\b\\s+(\"[^\"]*\")",
+          "captures": {
+            "1": {
+              "name": "keyword.control.module.lfx"
+            },
+            "2": {
+              "name": "string.quoted.double.lfx"
+            }
+          }
+        }
+      ]
+    },
+    "imports": {
+      "patterns": [
+        {
+          "name": "meta.import.lfx",
+          "match": "\\b(import)\\b\\s+(\"([A-Za-z_][A-Za-z0-9_]*(?:\\/[A-Za-z_][A-Za-z0-9_]*)*)\")(?:\\s+\\b(as)\\b\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+          "captures": {
+            "1": {
+              "name": "keyword.control.import.lfx"
+            },
+            "2": {
+              "name": "string.quoted.double.lfx"
+            },
+            "3": {
+              "name": "entity.name.namespace.module-path.lfx"
+            },
+            "4": {
+              "name": "keyword.control.import.lfx"
+            },
+            "5": {
+              "name": "entity.name.alias.lfx"
+            }
+          }
+        },
+        {
+          "name": "constant.other.module.stdlib.lfx",
+          "match": "\\bstd\\/(?:math|noise|wave|palette|ease|geo|warp|patterns)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.lfx",
+          "match": "\\b(?:version|module|library|import|as|export|effect|output|params|timeline|function|end|if|then|elseif|else|return|and|or|not)\\b"
+        }
+      ]
+    },
+    "functionDeclaration": {
+      "patterns": [
+        {
+          "name": "meta.function.lfx",
+          "match": "\\b(export\\s+)?(function)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.export.lfx"
+            },
+            "2": {
+              "name": "storage.type.function.lfx"
+            },
+            "3": {
+              "name": "entity.name.function.lfx"
+            }
+          }
+        },
+        {
+          "name": "meta.function-call.lfx",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "support.function.call.lfx"
+            }
+          }
+        }
+      ]
+    },
+    "paramsBlock": {
+      "patterns": [
+        {
+          "name": "meta.params.key.lfx",
+          "match": "^(\\s*)([A-Za-z_][A-Za-z0-9_]*)(\\s*=)",
+          "captures": {
+            "2": {
+              "name": "variable.other.property.parameter.lfx"
+            },
+            "3": {
+              "name": "keyword.operator.assignment.lfx"
+            }
+          }
+        }
+      ]
+    },
+    "outputKinds": {
+      "patterns": [
+        {
+          "name": "storage.type.output.lfx",
+          "match": "\\b(?:scalar|rgb|rgbw)\\b"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.lfx",
+          "match": "\\b(?:vec2|vec3|vec4|abs|min|max|floor|ceil|sqrt|sin|cos|clamp|mix|fract|mod|pow|is_even|dot|length|distance|normalize|cross|project|reflect|__perlin|__voronoi|__voronoi_border|__worley)\\b"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.lfx",
+          "match": "\\b(?:true|false)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.lfx",
+          "match": "\\b\\d+\\.\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.lfx",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lfx",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    }
+  }
+}

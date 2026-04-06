@@ -14,6 +14,7 @@ import (
 	"github.com/BenStokmans/lfx/backend/naga"
 	"github.com/BenStokmans/lfx/backend/wgsl"
 	"github.com/BenStokmans/lfx/compiler"
+	"github.com/BenStokmans/lfx/ir"
 	"github.com/BenStokmans/lfx/modules"
 	"github.com/BenStokmans/lfx/runtime"
 	"github.com/BenStokmans/lfx/stdlib"
@@ -36,6 +37,8 @@ func run(args []string) error {
 		return runParse(args[1:])
 	case "check":
 		return runCheck(args[1:])
+	case "preview":
+		return runPreview(args[1:])
 	case "graph":
 		return runGraph(args[1:])
 	case "sample":
@@ -67,12 +70,26 @@ func runParse(args []string) error {
 
 func runCheck(args []string) error {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "print structured diagnostics as JSON")
 	filePath, opts, err := commonArgs(fs, args)
 	if err != nil {
 		return err
 	}
 
 	result, err := compiler.CheckFile(filePath, opts)
+	if *jsonOutput {
+		payload := checkJSONOutput{
+			FilePath: filePath,
+			OK:       err == nil,
+		}
+		if err == nil {
+			payload.ModulePath = result.Entry.ModPath
+			payload.Diagnostics = compiler.DiagnosticsFromWarnings(filePath, result.Entry.ModPath, result.Warnings)
+		} else {
+			payload.Diagnostics = compiler.DiagnosticsFromError(filePath, "", err)
+		}
+		return writeJSON(payload)
+	}
 	if err != nil {
 		return err
 	}
@@ -122,6 +139,45 @@ func runGraph(args []string) error {
 		Entry: result.Graph.Entry,
 		Nodes: nodes,
 	})
+}
+
+func runPreview(args []string) error {
+	fs := flag.NewFlagSet("preview", flag.ContinueOnError)
+	jsonOutput := fs.Bool("json", false, "print preview payload as JSON")
+	var params kvFlags
+	fs.Var(&params, "param", "parameter override in name=value form")
+
+	filePath, opts, err := commonArgs(fs, args)
+	if err != nil {
+		return err
+	}
+
+	artifact, err := compiler.CompileForPreview(filePath, params.Values(), opts)
+	if !*jsonOutput {
+		if err != nil {
+			return err
+		}
+		fmt.Printf("ok %s (%s)\n", artifact.ModulePath, artifact.OutputType)
+		return nil
+	}
+
+	payload := previewJSONOutput{
+		FilePath: filePath,
+		OK:       err == nil,
+	}
+	if err != nil {
+		payload.Diagnostics = compiler.DiagnosticsFromError(filePath, "", err)
+		return writeJSON(payload)
+	}
+
+	payload.ModulePath = artifact.ModulePath
+	payload.OutputType = artifact.OutputType
+	payload.WGSL = artifact.WGSL
+	payload.Params = previewParamsFromSpecs(artifact.Params)
+	payload.BoundParams = artifact.BoundParams
+	payload.Timeline = previewTimelineFromSpec(artifact.Timeline)
+	payload.Diagnostics = artifact.Diagnostics
+	return writeJSON(payload)
 }
 
 func runSample(args []string) error {
@@ -230,11 +286,86 @@ func writeOutput(path string, data []byte) error {
 		_, err := os.Stdout.Write(data)
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
+}
+
+type previewParamJSON struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	DefaultValue any      `json:"defaultValue"`
+	Min          *float64 `json:"min,omitempty"`
+	Max          *float64 `json:"max,omitempty"`
+	EnumValues   []string `json:"enumValues,omitempty"`
+}
+
+type previewTimelineJSON struct {
+	LoopStart *float64 `json:"loopStart,omitempty"`
+	LoopEnd   *float64 `json:"loopEnd,omitempty"`
+}
+
+type previewJSONOutput struct {
+	FilePath    string                       `json:"filePath"`
+	ModulePath  string                       `json:"modulePath,omitempty"`
+	OK          bool                         `json:"ok"`
+	OutputType  string                       `json:"outputType,omitempty"`
+	WGSL        string                       `json:"wgsl,omitempty"`
+	Params      []previewParamJSON           `json:"params,omitempty"`
+	BoundParams map[string]any               `json:"boundParams,omitempty"`
+	Timeline    *previewTimelineJSON         `json:"timeline,omitempty"`
+	Diagnostics []compiler.PreviewDiagnostic `json:"diagnostics"`
+}
+
+func previewParamsFromSpecs(specs []ir.ParamSpec) []previewParamJSON {
+	if len(specs) == 0 {
+		return nil
+	}
+
+	params := make([]previewParamJSON, 0, len(specs))
+	for _, spec := range specs {
+		param := previewParamJSON{
+			Name: spec.Name,
+			Min:  spec.Min,
+			Max:  spec.Max,
+		}
+
+		switch spec.Type {
+		case ir.ParamInt:
+			param.Type = "int"
+			param.DefaultValue = spec.IntDefault
+		case ir.ParamFloat:
+			param.Type = "float"
+			param.DefaultValue = spec.FloatDefault
+		case ir.ParamBool:
+			param.Type = "bool"
+			param.DefaultValue = spec.BoolDefault
+		case ir.ParamEnum:
+			param.Type = "enum"
+			param.DefaultValue = spec.EnumDefault
+			param.EnumValues = append([]string(nil), spec.EnumValues...)
+		default:
+			param.Type = "unknown"
+		}
+
+		params = append(params, param)
+	}
+
+	return params
+}
+
+func previewTimelineFromSpec(spec *ir.TimelineSpec) *previewTimelineJSON {
+	if spec == nil {
+		return nil
+	}
+	return &previewTimelineJSON{
+		LoopStart: spec.LoopStart,
+		LoopEnd:   spec.LoopEnd,
+	}
 }
 
 func commonArgs(fs *flag.FlagSet, args []string) (string, compiler.Options, error) {
 	root := fs.String("root", "", "module root directory")
+	var moduleRoots stringFlags
+	fs.Var(&moduleRoots, "module-root", "additional module root directory (repeatable)")
 	fs.SetOutput(os.Stderr)
 	normalizedArgs, explicitFile := normalizeArgs(args)
 	if err := fs.Parse(normalizedArgs); err != nil {
@@ -254,7 +385,12 @@ func commonArgs(fs *flag.FlagSet, args []string) (string, compiler.Options, erro
 		baseDir = compiler.DetectBaseDir(filePath)
 	}
 
-	resolver := stdlib.NewResolver(modules.NewFileResolver(modules.DefaultRoots(baseDir)...))
+	roots := moduleRoots.Values()
+	if len(roots) == 0 {
+		roots = modules.DefaultRoots(baseDir)
+	}
+
+	resolver := stdlib.NewResolver(modules.NewFileResolver(roots...))
 	return filePath, compiler.Options{
 		BaseDir:  baseDir,
 		Resolver: resolver,
@@ -293,6 +429,13 @@ func writeJSON(v any) error {
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(v)
+}
+
+type checkJSONOutput struct {
+	FilePath    string                       `json:"filePath"`
+	ModulePath  string                       `json:"modulePath,omitempty"`
+	OK          bool                         `json:"ok"`
+	Diagnostics []compiler.PreviewDiagnostic `json:"diagnostics"`
 }
 
 type kvFlags struct {
@@ -334,6 +477,31 @@ func parseValue(raw string) any {
 		return f
 	}
 	return raw
+}
+
+type stringFlags struct {
+	items []string
+}
+
+func (s *stringFlags) String() string {
+	return strings.Join(s.items, ",")
+}
+
+func (s *stringFlags) Set(value string) error {
+	if value == "" {
+		return errors.New("value must not be empty")
+	}
+	s.items = append(s.items, value)
+	return nil
+}
+
+func (s *stringFlags) Values() []string {
+	if len(s.items) == 0 {
+		return nil
+	}
+	out := make([]string, len(s.items))
+	copy(out, s.items)
+	return out
 }
 
 func slicesSort(items []string) {

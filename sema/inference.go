@@ -290,7 +290,7 @@ func (i *inferencer) inferExpr(fn *parser.FuncDecl, expr parser.Expr, env map[st
 	case *parser.BinaryExpr:
 		left := i.inferExpr(fn, e.Left, env)
 		right := i.inferExpr(fn, e.Right, env)
-		typ = i.inferBinary(e, left, right, fn, env)
+		typ = i.inferBinary(e, left, right)
 
 	case *parser.DotExpr:
 		typ = i.inferDot(fn, e, env)
@@ -306,7 +306,7 @@ func (i *inferencer) inferExpr(fn *parser.FuncDecl, expr parser.Expr, env map[st
 	return typ
 }
 
-func (i *inferencer) inferBinary(expr *parser.BinaryExpr, left, right ir.Type, fn *parser.FuncDecl, env map[string]ir.Type) ir.Type {
+func (i *inferencer) inferBinary(expr *parser.BinaryExpr, left, right ir.Type) ir.Type {
 	switch expr.Op {
 	case "+", "-", "*", "/", "%":
 		if left.IsVector() || right.IsVector() {
