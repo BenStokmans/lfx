@@ -1,0 +1,65 @@
+module "std/geo"
+library "geo"
+
+-- Signed distance to a circle. Negative inside, positive outside.
+export function sdf_circle(px, py, cx, cy, r)
+  dx = px - cx
+  dy = py - cy
+  return sqrt(dx * dx + dy * dy) - r
+end
+
+-- Signed distance to an axis-aligned box with half-extents hw, hh.
+-- Negative inside, positive outside.
+export function sdf_box(px, py, cx, cy, hw, hh)
+  qx = abs(px - cx) - hw
+  qy = abs(py - cy) - hh
+  outside = sqrt(max(qx, 0.0) * max(qx, 0.0) + max(qy, 0.0) * max(qy, 0.0))
+  inside = min(max(qx, qy), 0.0)
+  return outside + inside
+end
+
+-- Distance from point (px,py) to line segment (ax,ay)-(bx,by).
+export function sdf_line(px, py, ax, ay, bx, by)
+  dx = bx - ax
+  dy = by - ay
+  len_sq = dx * dx + dy * dy
+  t = clamp(((px - ax) * dx + (py - ay) * dy) / max(len_sq, 0.0001), 0.0, 1.0)
+  projx = ax + t * dx - px
+  projy = ay + t * dy - py
+  return sqrt(projx * projx + projy * projy)
+end
+
+-- Signed distance to a ring (annulus) of radius r and half-thickness thickness.
+-- Negative inside the ring band, positive outside.
+export function sdf_ring(px, py, cx, cy, r, thickness)
+  dx = px - cx
+  dy = py - cy
+  d = sqrt(dx * dx + dy * dy)
+  return abs(d - r) - thickness
+end
+
+-- Radial distance from point (px,py) to center (cx,cy).
+export function polar_r(px, py, cx, cy)
+  return length(vec2(px - cx, py - cy))
+end
+
+-- Cosine of angle from center to point, remapped to [0,1].
+-- Returns 0 at left (theta=pi), 0.5 at top/bottom, 1 at right (theta=0).
+export function polar_theta(px, py, cx, cy)
+  dx = px - cx
+  dy = py - cy
+  len = max(sqrt(dx * dx + dy * dy), 0.0001)
+  return 0.5 + 0.5 * (dx / len)
+end
+
+-- Wrap value v into [lo, hi). Requires hi > lo.
+export function wrap(v, lo, hi)
+  range = hi - lo
+  return lo + mod(v - lo, range)
+end
+
+-- Linear remap from [in_lo, in_hi] to [out_lo, out_hi]. Unclamped.
+export function remap(v, in_lo, in_hi, out_lo, out_hi)
+  t = (v - in_lo) / max(in_hi - in_lo, 0.0001)
+  return out_lo + t * (out_hi - out_lo)
+end

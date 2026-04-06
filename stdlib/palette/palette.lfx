@@ -1,0 +1,48 @@
+module "std/palette"
+library "palette"
+
+-- Inigo Quilez cosine palette. Returns vec3 in [0,1]^3 (clamped).
+-- color[i] = a[i] + b[i] * cos(2*pi * (c[i]*t + d[i]))
+export function cosine(t, ar, ag, ab, br, bg, bb, cr, cg, cb, dr, dg, db)
+  tau = 6.28318530
+  r = ar + br * cos(tau * (cr * t + dr))
+  g = ag + bg * cos(tau * (cg * t + dg))
+  b = ab + bb * cos(tau * (cb * t + db))
+  return clamp(vec3(r, g, b), 0.0, 1.0)
+end
+
+-- Rainbow hue sweep (fixed cosine preset with phase offsets 0, 1/3, 2/3).
+-- Returns vec3 in [0,1]^3.
+export function rainbow(t)
+  tau = 6.28318530
+  r = 0.5 + 0.5 * cos(tau * t)
+  g = 0.5 + 0.5 * cos(tau * (t + 0.33333))
+  b = 0.5 + 0.5 * cos(tau * (t + 0.66667))
+  return vec3(r, g, b)
+end
+
+-- Fire palette: black -> red -> orange/yellow -> white.
+-- Returns vec3 in [0,1]^3.
+export function fire(t)
+  r = clamp(t * 3.0, 0.0, 1.0)
+  g = clamp((t - 0.33333) * 3.0, 0.0, 1.0)
+  b = clamp((t - 0.66667) * 3.0, 0.0, 1.0)
+  return vec3(r, g, b)
+end
+
+-- Grayscale: maps t to a neutral gray vec3.
+-- Returns vec3 in [0,1]^3.
+export function grayscale(t)
+  v = clamp(t, 0.0, 1.0)
+  return vec3(v, v, v)
+end
+
+-- Cool palette: cyan-to-magenta cosine sweep.
+-- Returns vec3 in [0,1]^3.
+export function cool(t)
+  tau = 6.28318530
+  r = 0.5 + 0.5 * cos(tau * (t + 0.5))
+  g = 0.5 + 0.5 * cos(tau * (t + 0.2))
+  b = 0.5 + 0.5 * cos(tau * (t + 0.25))
+  return clamp(vec3(r, g, b), 0.0, 1.0)
+end

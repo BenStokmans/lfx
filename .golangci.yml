@@ -1,0 +1,32 @@
+version: "2"
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - unparam
+    - nakedret
+    - prealloc
+    - forbidigo
+    - gosec
+    - gocritic
+    - bodyclose
+    - noctx
+    - goconst
+    - nilerr
+    - goprintffuncname
+    - whitespace
+    - gocyclo
+  
+  settings:
+    gocyclo:
+      min-complexity: 70
+    misspell:
+      locale: US
+  

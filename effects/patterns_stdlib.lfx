@@ -1,0 +1,16 @@
+version "0.1"
+module "effects/patterns_stdlib"
+import "std/patterns" as patterns
+effect "Patterns Stdlib"
+output scalar
+
+function sample(width, height, x, y, index, phase, params)
+  u = x / max(width, 1.0)
+  v = y / max(height, 1.0)
+  return patterns.checker(u + phase * 0.1, v, 6.0)
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
+}

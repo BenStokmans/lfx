@@ -1,0 +1,19 @@
+version "0.1"
+module "effects/wave_stdlib"
+import "std/wave" as wave
+effect "Wave Stdlib"
+output scalar
+
+function sample(width, height, x, y, index, phase, params)
+  px = x / max(width, 1.0)
+  py = y / max(height, 1.0)
+  s = wave.sine(px + phase)
+  tr = wave.triangle(py + phase * 0.5)
+  sq = wave.square(px * 2.0 + phase)
+  return clamp(s * 0.4 + tr * 0.4 + sq * 0.2, 0.0, 1.0)
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
+}

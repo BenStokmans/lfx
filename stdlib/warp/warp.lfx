@@ -1,0 +1,104 @@
+module "std/warp"
+library "warp"
+
+-- NOTE: __perlin is an FBM-based Perlin implementation that returns values
+-- centered around 0 (approximately [-0.4, 0.4]). Octave terms are accumulated
+-- directly (without subtracting 0.5), then mapped to [0,1] via 0.5 + sum.
+
+-- 2D fractional Brownian motion, 2 octaves. Returns [0,1].
+export function fbm2_2(x, y)
+  v = __perlin(vec2(x, y)) * 0.5
+  v = v + __perlin(vec2(x * 2.0, y * 2.0)) * 0.25
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 2D fractional Brownian motion, 4 octaves. Returns [0,1].
+export function fbm2_4(x, y)
+  v = __perlin(vec2(x, y)) * 0.5
+  v = v + __perlin(vec2(x * 2.0, y * 2.0)) * 0.25
+  v = v + __perlin(vec2(x * 4.0, y * 4.0)) * 0.125
+  v = v + __perlin(vec2(x * 8.0, y * 8.0)) * 0.0625
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 2D fractional Brownian motion, 6 octaves. Returns [0,1].
+export function fbm2_6(x, y)
+  v = __perlin(vec2(x, y)) * 0.5
+  v = v + __perlin(vec2(x * 2.0, y * 2.0)) * 0.25
+  v = v + __perlin(vec2(x * 4.0, y * 4.0)) * 0.125
+  v = v + __perlin(vec2(x * 8.0, y * 8.0)) * 0.0625
+  v = v + __perlin(vec2(x * 16.0, y * 16.0)) * 0.03125
+  v = v + __perlin(vec2(x * 32.0, y * 32.0)) * 0.015625
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 2D fractional Brownian motion, 8 octaves. Returns [0,1].
+export function fbm2_8(x, y)
+  v = __perlin(vec2(x, y)) * 0.5
+  v = v + __perlin(vec2(x * 2.0, y * 2.0)) * 0.25
+  v = v + __perlin(vec2(x * 4.0, y * 4.0)) * 0.125
+  v = v + __perlin(vec2(x * 8.0, y * 8.0)) * 0.0625
+  v = v + __perlin(vec2(x * 16.0, y * 16.0)) * 0.03125
+  v = v + __perlin(vec2(x * 32.0, y * 32.0)) * 0.015625
+  v = v + __perlin(vec2(x * 64.0, y * 64.0)) * 0.0078125
+  v = v + __perlin(vec2(x * 128.0, y * 128.0)) * 0.00390625
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 3D fractional Brownian motion, 4 octaves. Returns [0,1].
+export function fbm3_4(x, y, z)
+  v = __perlin(vec3(x, y, z)) * 0.5
+  v = v + __perlin(vec3(x * 2.0, y * 2.0, z * 2.0)) * 0.25
+  v = v + __perlin(vec3(x * 4.0, y * 4.0, z * 4.0)) * 0.125
+  v = v + __perlin(vec3(x * 8.0, y * 8.0, z * 8.0)) * 0.0625
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 3D fractional Brownian motion, 6 octaves. Returns [0,1].
+export function fbm3_6(x, y, z)
+  v = __perlin(vec3(x, y, z)) * 0.5
+  v = v + __perlin(vec3(x * 2.0, y * 2.0, z * 2.0)) * 0.25
+  v = v + __perlin(vec3(x * 4.0, y * 4.0, z * 4.0)) * 0.125
+  v = v + __perlin(vec3(x * 8.0, y * 8.0, z * 8.0)) * 0.0625
+  v = v + __perlin(vec3(x * 16.0, y * 16.0, z * 16.0)) * 0.03125
+  v = v + __perlin(vec3(x * 32.0, y * 32.0, z * 32.0)) * 0.015625
+  return clamp(0.5 + v, 0.0, 1.0)
+end
+
+-- 2D domain warp: displaces (x,y) by two independent fbm samples, then samples fbm.
+-- strength controls displacement magnitude. fbm logic is inlined (4 octaves).
+export function warp2(x, y, strength)
+  -- compute displacement dx via fbm at (x+1.7, y+9.2)
+  ox = x + 1.7
+  oy = y + 9.2
+  dxv = __perlin(vec2(ox, oy)) * 0.5
+  dxv = dxv + __perlin(vec2(ox * 2.0, oy * 2.0)) * 0.25
+  dxv = dxv + __perlin(vec2(ox * 4.0, oy * 4.0)) * 0.125
+  dxv = dxv + __perlin(vec2(ox * 8.0, oy * 8.0)) * 0.0625
+  dx = clamp(0.5 + dxv, 0.0, 1.0)
+  -- compute displacement dy via fbm at (x+8.3, y+2.8)
+  ox2 = x + 8.3
+  oy2 = y + 2.8
+  dyv = __perlin(vec2(ox2, oy2)) * 0.5
+  dyv = dyv + __perlin(vec2(ox2 * 2.0, oy2 * 2.0)) * 0.25
+  dyv = dyv + __perlin(vec2(ox2 * 4.0, oy2 * 4.0)) * 0.125
+  dyv = dyv + __perlin(vec2(ox2 * 8.0, oy2 * 8.0)) * 0.0625
+  dy = clamp(0.5 + dyv, 0.0, 1.0)
+  -- warp the coordinate and sample fbm
+  wx = x + strength * (dx - 0.5) * 2.0
+  wy = y + strength * (dy - 0.5) * 2.0
+  wv = __perlin(vec2(wx, wy)) * 0.5
+  wv = wv + __perlin(vec2(wx * 2.0, wy * 2.0)) * 0.25
+  wv = wv + __perlin(vec2(wx * 4.0, wy * 4.0)) * 0.125
+  wv = wv + __perlin(vec2(wx * 8.0, wy * 8.0)) * 0.0625
+  return clamp(0.5 + wv, 0.0, 1.0)
+end
+
+-- 2D turbulence: absolute-value fbm for a turbulent, billowing look. Returns [0,1].
+export function turbulence2(x, y)
+  v = abs(__perlin(vec2(x, y))) * 0.5
+  v = v + abs(__perlin(vec2(x * 2.0, y * 2.0))) * 0.25
+  v = v + abs(__perlin(vec2(x * 4.0, y * 4.0))) * 0.125
+  v = v + abs(__perlin(vec2(x * 8.0, y * 8.0))) * 0.0625
+  return clamp(v * 2.5, 0.0, 1.0)
+end

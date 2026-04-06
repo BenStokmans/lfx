@@ -1,0 +1,16 @@
+version "0.1"
+module "effects/warp_stdlib"
+import "std/warp" as warp
+effect "Warp Stdlib"
+output scalar
+
+function sample(width, height, x, y, index, phase, params)
+  px = x / max(width, 1.0) * 3.0 + phase
+  py = y / max(height, 1.0) * 3.0
+  return warp.warp2(px, py, 1.5)
+end
+
+timeline {
+  loop_start = 0.0
+  loop_end = 1.0
+}

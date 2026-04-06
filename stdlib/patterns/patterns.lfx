@@ -1,0 +1,64 @@
+module "std/patterns"
+library "patterns"
+
+-- Checkerboard pattern. u,v are UV coordinates, scale controls cell size.
+-- Returns 0 or 1.
+export function checker(u, v, scale)
+  return mod(floor(u * scale) + floor(v * scale), 2.0)
+end
+
+-- Horizontal stripes along u axis. Returns 0 or 1.
+export function stripes_h(u, scale)
+  return mod(floor(u * scale), 2.0)
+end
+
+-- Vertical stripes along v axis. Returns 0 or 1.
+export function stripes_v(v, scale)
+  return mod(floor(v * scale), 2.0)
+end
+
+-- Circular dot pattern. radius in (0, 0.5]. Returns [0,1] (1 at dot center).
+export function dots(u, v, scale, radius)
+  fu = fract(u * scale) - 0.5
+  fv = fract(v * scale) - 0.5
+  d = sqrt(fu * fu + fv * fv)
+  r = clamp(radius, 0.0, 0.5)
+  return 1.0 - clamp(d / max(r, 0.0001), 0.0, 1.0)
+end
+
+-- Grid lines. line_width controls line thickness relative to cell size.
+-- Returns [0,1] (1 on grid lines, 0 in cell interior).
+export function grid(u, v, scale, line_width)
+  fu = fract(u * scale)
+  fv = fract(v * scale)
+  du = min(fu, 1.0 - fu)
+  dv = min(fv, 1.0 - fv)
+  lw = clamp(line_width, 0.0, 0.5)
+  return 1.0 - clamp(min(du, dv) / max(lw, 0.0001), 0.0, 1.0)
+end
+
+-- Hexagonal tiling (skewed-grid approximation). Returns [0,1] (1 at hex center).
+export function hex(u, v, scale)
+  su = u * scale
+  sv = v * scale
+  hx = su + sv * 0.57735027
+  hy = sv * 1.15470054
+  ix = floor(hx)
+  iy = floor(hy)
+  fx = hx - ix - 0.5
+  fy = hy - iy - 0.5
+  d = sqrt(fx * fx + fy * fy)
+  return clamp(1.0 - d * 2.0, 0.0, 1.0)
+end
+
+-- Brick pattern with alternating row offset. offset in [0,1] shifts every other row.
+-- Returns [0,1] (1 in brick interior, 0 at seams).
+export function brick(u, v, scale, offset)
+  row = floor(v * scale)
+  shift = mod(row, 2.0) * offset
+  fu = fract((u + shift) * scale)
+  fv = fract(v * scale)
+  su = min(fu, 1.0 - fu)
+  sv = min(fv, 1.0 - fv)
+  return clamp(min(su, sv) * scale * 2.0, 0.0, 1.0)
+end

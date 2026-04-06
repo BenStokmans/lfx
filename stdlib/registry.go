@@ -10,12 +10,18 @@ import (
 
 const Version = "0.2"
 
-//go:embed math/*.lfx noise/*.lfx
+//go:embed math/*.lfx noise/*.lfx wave/*.lfx palette/*.lfx ease/*.lfx geo/*.lfx warp/*.lfx patterns/*.lfx
 var files embed.FS
 
 var manifest = map[string]string{
-	"std/math":  "math/math.lfx",
-	"std/noise": "noise/noise.lfx",
+	"std/math":     "math/math.lfx",
+	"std/noise":    "noise/noise.lfx",
+	"std/wave":     "wave/wave.lfx",
+	"std/palette":  "palette/palette.lfx",
+	"std/ease":     "ease/ease.lfx",
+	"std/geo":      "geo/geo.lfx",
+	"std/warp":     "warp/warp.lfx",
+	"std/patterns": "patterns/patterns.lfx",
 }
 
 // Paths returns the embedded stdlib module paths.

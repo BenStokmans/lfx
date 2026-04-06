@@ -1,0 +1,50 @@
+module "std/wave"
+library "wave"
+
+-- Sinusoidal wave. t is phase (wraps). Returns [0,1].
+export function sine(t)
+  return 0.5 + 0.5 * sin(t * 6.28318530)
+end
+
+-- Triangle wave. t is phase (wraps). Returns [0,1].
+export function triangle(t)
+  p = fract(t)
+  if p < 0.5 then
+    return p * 2.0
+  else
+    return (1.0 - p) * 2.0
+  end
+end
+
+-- Sawtooth ramp 0->1. t is phase (wraps). Returns [0,1).
+export function sawtooth(t)
+  return fract(t)
+end
+
+-- Reverse sawtooth ramp 1->0. t is phase (wraps). Returns (0,1].
+export function ramp_down(t)
+  return 1.0 - fract(t)
+end
+
+-- Square wave, 50% duty cycle. Returns 0 or 1.
+export function square(t)
+  if fract(t) < 0.5 then
+    return 1.0
+  else
+    return 0.0
+  end
+end
+
+-- Pulse wave with variable duty cycle. width in [0,1]. Returns 0 or 1.
+export function pulse(t, width)
+  if fract(t) < clamp(width, 0.0, 1.0) then
+    return 1.0
+  else
+    return 0.0
+  end
+end
+
+-- Scaled sine: freq controls cycles per unit, phase_offset shifts in phase space.
+export function sine_scaled(t, freq, phase_offset)
+  return 0.5 + 0.5 * sin((t * freq + phase_offset) * 6.28318530)
+end

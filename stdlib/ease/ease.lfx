@@ -1,0 +1,75 @@
+module "std/ease"
+library "ease"
+
+-- Cubic Hermite smoothstep. t in [0,1] -> [0,1].
+export function smoothstep(t)
+  return t * t * (3.0 - 2.0 * t)
+end
+
+-- Quintic smoothstep (C2 continuous). t in [0,1] -> [0,1].
+export function smootherstep(t)
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+end
+
+-- Quadratic ease-in.
+export function ease_in(t)
+  return t * t
+end
+
+-- Quadratic ease-out.
+export function ease_out(t)
+  s = 1.0 - t
+  return 1.0 - s * s
+end
+
+-- Cubic ease-in.
+export function ease_in_cubic(t)
+  return t * t * t
+end
+
+-- Cubic ease-out.
+export function ease_out_cubic(t)
+  s = 1.0 - t
+  return 1.0 - s * s * s
+end
+
+-- Quadratic ease-in then ease-out.
+export function ease_in_out(t)
+  if t < 0.5 then
+    return 2.0 * t * t
+  else
+    s = 1.0 - t
+    return 1.0 - 2.0 * s * s
+  end
+end
+
+-- Schlick gain: reshapes [0,1]->[0,1] keeping f(0)=0, f(0.5)=0.5, f(1)=1.
+-- k=1 is linear identity. k>1 pulls toward extremes, k<1 pulls toward center.
+export function gain(t, k)
+  if t < 0.5 then
+    return 0.5 * pow(2.0 * t, k)
+  else
+    return 1.0 - 0.5 * pow(2.0 - 2.0 * t, k)
+  end
+end
+
+-- Schlick bias: bends the curve toward 0 (k<0.5) or 1 (k>0.5). k must be in (0,1).
+export function bias(t, k)
+  return t / ((1.0 / k - 2.0) * (1.0 - t) + 1.0)
+end
+
+-- Quadratic bounce ease-out (3-segment unrolled).
+export function bounce_out(t)
+  if t < 0.36364 then
+    return 7.5625 * t * t
+  elseif t < 0.72727 then
+    s = t - 0.54545
+    return 7.5625 * s * s + 0.75
+  elseif t < 0.90909 then
+    s = t - 0.81818
+    return 7.5625 * s * s + 0.9375
+  else
+    s = t - 0.95455
+    return 7.5625 * s * s + 0.984375
+  end
+end

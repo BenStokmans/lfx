@@ -82,7 +82,7 @@ func (a *App) LoadWorkspace(root string) (*WorkspaceData, error) {
 		}
 		if d.IsDir() {
 			switch d.Name() {
-			case ".git", "node_modules", "dist", "build":
+			case ".git", "node_modules", "dist", "build", "stdlib":
 				return filepath.SkipDir
 			}
 			return nil
