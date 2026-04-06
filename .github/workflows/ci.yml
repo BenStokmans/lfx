@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.26"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (with race detector)
+        run: go test -race -timeout 300s ./...
+
+  fuzz-smoke:
+    name: Fuzz Smoke (short)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Fuzz - FuzzParser (5 s)
+        run: go test -run='^$' -fuzz=FuzzParser -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzModuleGraph (5 s)
+        run: go test -run='^$' -fuzz=FuzzModuleGraph -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzScalarExpressions (5 s)
+        run: go test -run='^$' -fuzz=FuzzScalarExpressions -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzVectorExpressions (5 s)
+        run: go test -run='^$' -fuzz=FuzzVectorExpressions -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzRuntimeBind (5 s)
+        run: go test -run='^$' -fuzz=FuzzRuntimeBind -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzWGSLEmitter (5 s)
+        run: go test -run='^$' -fuzz=FuzzWGSLEmitter -fuzztime=5s . 2>&1 || true
+
+      - name: Fuzz - FuzzCPUDeterminism (5 s)
+        run: go test -run='^$' -fuzz=FuzzCPUDeterminism -fuzztime=5s . 2>&1 || true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
