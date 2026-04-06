@@ -57,17 +57,17 @@ go run ./cmd/lfx sample --layout layout.json --phase 0.5 --param intensity=0.75 
 
 ## Preview App
 
-The `preview/` directory contains a separate Wails application for interactive effect previewing.
+The `lfx-preview/` directory contains a separate Wails application for interactive effect previewing.
 
 ```bash
-cd preview
+cd lfx-preview
 wails dev
 ```
 
 For a production build:
 
 ```bash
-cd preview
+cd lfx-preview
 wails build
 ```
 
@@ -88,7 +88,7 @@ The current language description is documented in [docs/LANGUAGE.md](docs/LANGUA
 - `backend` - CPU evaluator and WGSL backend
 - `stdlib` - built-in library modules
 - `effects` - example effect programs
-- `preview` - Wails preview application
+- `lfx-preview` - Wails preview application
 
 ## Notes
 
