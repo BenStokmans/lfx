@@ -4,9 +4,9 @@
     "type": "git",
     "url": "https://github.com/BenStokmans/lfx"
   },
-  "displayName": "LFX Language Support",
-  "description": "LFX Language Support adds first-class editing support for `.lfx` files in Visual Studio Code.",
-  "version": "0.1.0",
+  "displayName": "LFX Shader DSL Toolkit",
+  "description": "LFX Shader DSL Toolkit adds first-class editing, diagnostics, and preview tooling for `.lfx` files in Visual Studio Code.",
+  "version": "0.1.1",
   "publisher": "BenStokmans",
   "license": "MIT",
   "icon": "media/icon.png",

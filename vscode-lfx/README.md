@@ -1,6 +1,6 @@
-# LFX Language Support
+# LFX Shader DSL Toolkit
 
-LFX Language Support adds first-class editing support for `.lfx` files in Visual Studio Code.
+LFX Shader DSL Toolkit adds first-class editing, diagnostics, and preview tooling for `.lfx` files in Visual Studio Code.
 
 It provides:
 
@@ -8,7 +8,7 @@ It provides:
 - comment, bracket, auto-closing, folding, and indentation behavior
 - snippets for common LFX constructs
 - inline parse and semantic diagnostics by running the `lfx` checker
-- commands to validate the current file and inspect generated WGSL
+- commands to validate files, inspect generated WGSL, and work with live preview tools
 
 This extension is intended for authors working with the LFX language and toolchain. It focuses on fast feedback and solid authoring ergonomics without requiring a full language server.
 
@@ -29,6 +29,9 @@ This extension is intended for authors working with the LFX language and toolcha
   - `LFX: Check Workspace`
   - `LFX: Show Generated WGSL`
   - `LFX: Open Module Graph`
+  - `LFX: WebGPU Probe`
+  - `LFX: Open Live Preview`
+  - `LFX: Refresh Live Preview`
 
 ## Settings
 
@@ -38,6 +41,10 @@ This extension is intended for authors working with the LFX language and toolcha
 - `lfx.check.debounceMs`: debounce delay in milliseconds for on-type checks. Default: `400`.
 - `lfx.moduleRoots`: additional module roots passed through as repeated `--module-root` flags.
 - `lfx.trace.diagnostics`: log CLI tracing and diagnostics flow to the output channel.
+- `lfx.preview.enableOnSave`: refresh the live preview when saving the active `.lfx` file. Default: `true`.
+- `lfx.preview.trackActiveEditor`: retarget an open preview when switching active `.lfx` editors. Default: `true`.
+- `lfx.preview.preferredLayout`: default built-in layout used by the live preview panel.
+- `lfx.preview.trace`: log preview protocol and runtime tracing to the output channel. Default: `false`.
 
 ## Notes
 
