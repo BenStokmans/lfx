@@ -68,14 +68,6 @@ func (a *analyzer) addError(pos parser.Pos, code, msg string) {
 	a.errors = append(a.errors, Error{Pos: pos, Code: code, Msg: msg})
 }
 
-func (a *analyzer) addErrorLen(pos parser.Pos, length int, code, msg string) {
-	a.errors = append(a.errors, Error{Pos: pos, Length: length, Code: code, Msg: msg})
-}
-
-func (a *analyzer) addWarning(pos parser.Pos, code, msg string) {
-	a.warnings = append(a.warnings, Warning{Pos: pos, Code: code, Msg: msg})
-}
-
 func (a *analyzer) addWarningLen(pos parser.Pos, length int, code, msg string) {
 	a.warnings = append(a.warnings, Warning{Pos: pos, Length: length, Code: code, Msg: msg})
 }

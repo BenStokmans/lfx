@@ -286,7 +286,7 @@ func writeOutput(path string, data []byte) error {
 		_, err := os.Stdout.Write(data)
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	return os.WriteFile(filepath.Clean(path), data, 0600)
 }
 
 type previewParamJSON struct {
@@ -408,7 +408,7 @@ func normalizeArgs(args []string) ([]string, string) {
 }
 
 func loadLayout(path string) (runtime.Layout, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return runtime.Layout{}, fmt.Errorf("reading %s: %w", path, err)
 	}
